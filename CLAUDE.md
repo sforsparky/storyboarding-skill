@@ -10,13 +10,14 @@ custom graphics locally, and Higgsfield generates B-roll.
 from it. Edit the JSON (or the Sheet, then `/pull-feedback`), never treat the Sheet as the master.
 
 ## Layout
-- `brands/<brand>/brand.json` + `logos/` — one per brand. `_template/` to start a new one.
+- `brands/<brand>/` — `refs/` (drop assets here), `brand.json` + `brand.md` (built by /brand), `logos/`. `_template/` to start one.
 - `projects/<name>/` — `script.md`, `storyboard.json`, `assets/` (NNN_slug.mp4 + .png), `handoff/`.
-- `.claude/skills/{storyboard,push-sheet,generate,handoff}/` — the four workflow skills + scripts.
+- `.claude/skills/{brand,storyboard,push-sheet,generate,handoff}/` — the workflow skills + scripts.
 - `.claude/skills/generate/templates/` — reusable HyperFrames compositions (e.g. portfolio-bar-drop).
 - `.venv/` — Python deps (openpyxl, google-api-python-client). `.secrets/` — Google OAuth (gitignored).
 
 ## Workflow
+0. `/brand` — drop reference assets in `brands/<brand>/refs/`; extracts palette + writes brand.json/brand.md.
 1. `/storyboard` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 2. `/push-sheet` — storyboard.json → Google Sheet the team reviews in; `/pull-feedback` reads notes/status back.
 3. `/generate 7,45` — row brief + brand → HyperFrames graphic (local) or Higgsfield B-roll, named by row.
