@@ -3,7 +3,7 @@
 
 Creates projects/<name>/ with assets/, handoff/, a script.md starter, and a storyboard.json
 skeleton wired to a brand. If the brand folder does not exist yet, it is created from
-brands/_template so you can drop reference assets in and run /brand. Safe: refuses to clobber an
+brands/_template so you can drop reference assets in and run /storyboard-brand. Safe: refuses to clobber an
 existing project.
 
 Usage:
@@ -63,12 +63,12 @@ def main():
     print(f"brand: brands/{brand}/" + ("  [new — from _template]" if brand_created else "  [existing]"))
     print("\nnext:")
     if brand_created:
-        print(f"  1. drop brand assets into brands/{brand}/refs/  then run:  /brand {brand}")
+        print(f"  1. drop brand assets into brands/{brand}/refs/  then run:  /storyboard-brand {brand}")
         print(f"  2. paste the script into projects/{name}/script.md")
-        print(f"  3. /storyboard for projects/{name} using brand {brand}")
+        print(f"  3. /storyboard-build for projects/{name} using brand {brand}")
     else:
         print(f"  1. paste the script into projects/{name}/script.md")
-        print(f"  2. /storyboard for projects/{name} using brand {brand}")
+        print(f"  2. /storyboard-build for projects/{name} using brand {brand}")
 
 if __name__ == "__main__":
     main()

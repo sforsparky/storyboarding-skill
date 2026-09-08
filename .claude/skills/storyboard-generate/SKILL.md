@@ -1,5 +1,5 @@
 ---
-name: generate
+name: storyboard-generate
 description: >
   Generate the asset(s) for storyboard rows from their brief + brand kit. Custom graphics render
   locally via HyperFrames (replacing hand Adobe work); B-roll via Higgsfield (silent, no audio);
@@ -7,16 +7,16 @@ description: >
   lists, a whole visual type, a continuous Higgsfield clip spanning a row range, and a style-linked series of stills.
 ---
 
-# /generate — rows → asset(s)
+# /storyboard-generate — rows → asset(s)
 
 Selection syntax:
-- `/generate 7` — one row.
-- `/generate 5,7,45` — several independent rows.
-- `/generate 43-46` — a range, each row generated independently.
-- `/generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
-- `/generate series 50-56` — a still IMAGE per row across the range, storyboard/previz frames that
+- `/storyboard-generate 7` — one row.
+- `/storyboard-generate 5,7,45` — several independent rows.
+- `/storyboard-generate 43-46` — a range, each row generated independently.
+- `/storyboard-generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
+- `/storyboard-generate series 50-56` — a still IMAGE per row across the range, storyboard/previz frames that
   share a look and can later seed clips (see "Series of stills").
-- `/generate custom-graphic` — every row of that visual type.
+- `/storyboard-generate custom-graphic` — every row of that visual type.
 
 Route by `visual_type` (see `scripts/lib_types.py` GENERATED_BY_TYPE).
 
@@ -60,7 +60,7 @@ with its own in/out time:
    `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> b_roll higgsfield <total_dur>`
    splits the duration evenly across the rows, or pass explicit cut points as trailing
    `t0 t1 t2 ...` seconds. Each row gets `assets:[{file, poster, segment:[in,out], clip_group}]`.
-4. `/handoff` ships the single clip once and lists each row's in/out in the manifest, so the editor
+4. `/storyboard-handoff` ships the single clip once and lists each row's in/out in the manifest, so the editor
    knows where each script beat falls inside it.
 
 ## Series of stills — one image per row (`series A-B`)
@@ -72,7 +72,7 @@ later, feed into image-to-video to make clips. Each row gets its own still image
 3. Download each to `assets/<NNN_slug>.png`, and register with kind `still` and a shared `series_id`:
    `generate_row.py register <sb.json> <n> <png_rel> <png_rel> still higgsfield "" <series_id>`
    (the still is its own poster). Rows read as a set; regenerating one keeps the shared preamble.
-4. To turn an approved still into motion later, run `/generate clip` on that row (or range) using
+4. To turn an approved still into motion later, run `/storyboard-generate clip` on that row (or range) using
    the still as the start frame.
 
 ## TALKING HEAD / + LOWER THIRD / CUTAWAY → still (no generation)
@@ -82,6 +82,6 @@ Copy the `reuse_of` row's still, or a labelled placeholder card if none yet.
 A card naming the URL/screen to capture; the human records it.
 
 ## After generating
-- Name outputs `NNN_slug.ext` (three-digit row number) so `/handoff` is a copy.
-- Write the asset into the row's `assets[]`, set `status` to `Generated`, re-run `/push-sheet`.
+- Name outputs `NNN_slug.ext` (three-digit row number) so `/storyboard-handoff` is a copy.
+- Write the asset into the row's `assets[]`, set `status` to `Generated`, re-run `/storyboard-sheet`.
 - `scripts/generate_row.py` holds download / silence / register / register_span helpers.

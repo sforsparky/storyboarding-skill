@@ -14,14 +14,14 @@ Node 22+ and FFmpeg are needed for graphic rendering (`npx hyperframes …`).
 For Sheets sync, drop a Google Desktop-OAuth client at `.secrets/credentials.json` (one-time).
 
 ## Workflow (Claude Code skills in `.claude/skills/`)
-1. `/storyboard` — `script.md` → `storyboard.json` (rows, sections, visual types, briefs, reuse).
-2. `/push-sheet` — push to a Google Sheet the team reviews in; `/pull-feedback` reads notes/status back.
-3. `/generate 7` · `/generate span 43-46` · `/generate series 50-56` — briefs → graphics/B-roll, named by row.
-4. `/handoff` — approved assets → `handoff/` named by row + `manifest.csv`, mirrored to Drive.
+1. `/storyboard-build` — `script.md` → `storyboard.json` (rows, sections, visual types, briefs, reuse).
+2. `/storyboard-sheet` — push to a Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
+3. `/storyboard-generate 7` · `/storyboard-generate span 43-46` · `/storyboard-generate series 50-56` — briefs → graphics/B-roll, named by row.
+4. `/storyboard-handoff` — approved assets → `handoff/` named by row + `manifest.csv`, mirrored to Drive.
 
 See [CLAUDE.md](CLAUDE.md) for the full layout and conventions.
 
 ## Layout
 - `brands/<brand>/` — brand kit (`brand.json` + `logos/`); `_template/` to start a new one.
 - `projects/<name>/` — `script.md`, `storyboard.json` (source of truth), `assets/`, `handoff/`.
-- `.claude/skills/{storyboard,push-sheet,generate,handoff}/` — the four workflow skills + scripts.
+- `.claude/skills/{storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the four workflow skills + scripts.

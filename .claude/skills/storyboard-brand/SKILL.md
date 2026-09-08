@@ -1,17 +1,17 @@
 ---
-name: brand
+name: storyboard-brand
 description: >
   Build or refine a brand's design system from reference assets the user drops in — no hand-editing
   JSON. Read logos, frames, screenshots, style tiles, and existing graphics from brands/<brand>/refs/,
-  extract an accurate color palette programmatically, and synthesize brands/<brand>/brand.json plus a
+  extract an accurate color palette programmatically, and synthesize brands/<brand>/storyboard-brand.json plus a
   human-readable brand.md. Use when starting a new brand or updating one from new references.
 ---
 
-# /brand — reference assets → design system
+# /storyboard-brand — reference assets → design system
 
 The user develops a brand by **pasting assets**, not writing JSON. They drop files into
-`brands/<brand>/refs/`; this skill turns them into `brand.json` (consumed by /storyboard and
-/generate) and `brand.md` (a readable summary for humans).
+`brands/<brand>/refs/`; this skill turns them into `brand.json` (consumed by /storyboard-build and
+/storyboard-generate) and `brand.md` (a readable summary for humans).
 
 Good refs: logo files (svg/png), brand frames or thumbnails, a website/deck screenshot, a style
 tile or one-pager, existing custom graphics, a palette swatch. More is better; 3–8 is plenty.
@@ -31,7 +31,7 @@ tile or one-pager, existing custom graphics, a palette swatch. More is better; 3
 3. **Write `brand.json`** using the `_template` shape: `colors` (primary, primary_bright, ink,
    paper, up, down, muted — mapped from the extracted roles), `type`, `logos`, `products`,
    `presenters`, `tone`, `motifs`, `broll_style`, `graphic_style`. Record the source hexes so a
-   later /brand run can refine rather than restart.
+   later /storyboard-brand run can refine rather than restart.
 4. **Write `brand.md`** — the same system in prose plus the swatch, so a human can eyeball it.
 5. **Confirm with the user**, showing the swatch and the 2–3 judgment calls you made (which colors
    you treated as brand vs scenery, the font guess). They correct in one message; you don't ask

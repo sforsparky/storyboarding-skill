@@ -1,12 +1,12 @@
 ---
-name: push-sheet
+name: storyboard-sheet
 description: >
   Sync storyboard.json to a Google Sheet the team reviews in, and pull comments/notes back.
   No server, no database — a local script talks to Google Sheets + Drive with a one-time OAuth
   consent. Use to create/update a board's Sheet, or to collect feedback before regenerating.
 ---
 
-# /push-sheet and /pull-feedback
+# /storyboard-sheet — push & pull the Google Sheet
 
 Google Sheets is the collaboration surface and the only "database". The script writes the Sheet
 from `storyboard.json` and reads feedback back into it. Nothing is hosted.
@@ -17,7 +17,7 @@ from `storyboard.json` and reads feedback back into it. Nothing is hosted.
 2. First run opens a browser for consent and caches `.secrets/token.json`. No further prompts.
 
 ## Push
-`scripts/sheets_sync.py push projects/<name>/storyboard.json`
+`scripts/sheets_sync.py push projects/<name>/storyboard-build.json`
 - Creates the Sheet on first run and stores `sheet_id` + `drive_folder_id` back into the JSON.
 - Columns: Line #, Visual, Script, Visual Direction, Notes, Status, Thumbnail, plus a hidden
   Row-ID column so re-pushes update in place (comments stay attached, no renumbering).
@@ -28,9 +28,9 @@ from `storyboard.json` and reads feedback back into it. Nothing is hosted.
   the `reuse_of` row's poster automatically.
 
 ## Pull feedback
-`scripts/sheets_sync.py pull projects/<name>/storyboard.json`
+`scripts/sheets_sync.py pull projects/<name>/storyboard-build.json`
 - Reads the Notes column and the Drive comments API, appends new items to each row's `feedback[]`
-  keyed by Row-ID, so the next `/generate` includes reviewer feedback in the prompt.
+  keyed by Row-ID, so the next `/storyboard-generate` includes reviewer feedback in the prompt.
 
 ## Notes
 - Client stays a Desktop OAuth app; no service account, no shared secret to rotate.
