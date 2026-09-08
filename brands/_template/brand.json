@@ -1,0 +1,29 @@
+{
+  "brand_id": "_template",
+  "name": "Brand Name",
+  "products": ["Product or offer name"],
+  "presenters": [
+    {"name": "Presenter Name", "role": "host", "lower_third": "Presenter Name"}
+  ],
+  "tone": ["confident", "direct", "credible"],
+  "colors": {
+    "primary": "#000000",
+    "primary_bright": "#00FF00",
+    "ink": "#111827",
+    "paper": "#FFFFFF",
+    "up": "#16A34A",
+    "down": "#DC2626",
+    "muted": "#6B7280"
+  },
+  "type": {
+    "display": "Inter, system-ui, sans-serif",
+    "body": "Inter, system-ui, sans-serif"
+  },
+  "logos": {
+    "mark": "logos/mark.svg",
+    "wordmark": "logos/wordmark.svg"
+  },
+  "motifs": ["describe any recurring visual motif, e.g. low-poly bull and bear"],
+  "broll_style": "One sentence describing the look B-roll should share across a project: lens, grade, setting, mood.",
+  "graphic_style": "One sentence describing custom-graphic look: flat vs dimensional, corner radius, background, motion feel."
+}

@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets — never commit Google OAuth
+.secrets/
+**/token.json
+**/credentials.json
+
+# Generated / derived artifacts (regenerable from storyboard.json)
+projects/*/assets/
+projects/*/handoff/
+projects/*/*.xlsx
+
+# Large source example (test fixture, kept local)
+_example/
+_inspiration/
+
+# OS
+.DS_Store
+node_modules/
