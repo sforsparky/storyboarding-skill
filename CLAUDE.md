@@ -12,7 +12,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 
 ## Layout
 - A **project folder** (anywhere) holds: `script.md`, `storyboard.json`, `assets/` (NNN_slug.mp4 + .png), `handoff/`, and `brands/<brand>/` (its own brand: `refs/`, `brand.json` + `brand.md`, `logos/`).
-- This **skills repo** holds the six skills and `brands/_template/` (the brand template new projects copy).
+- This **skills repo** holds the seven skills and `brands/_template/` (the brand template new projects copy).
 - `.claude/skills/{storyboard-new,storyboard-brand,storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the workflow skills + scripts.
 - `.claude/skills/storyboard-generate/templates/` — reusable HyperFrames compositions (e.g. portfolio-bar-drop).
 - `.venv/` — Python deps (openpyxl, google-api-python-client). `.secrets/` — Google OAuth (gitignored).
@@ -23,6 +23,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 1. `/storyboard-build` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 2. `/storyboard-sheet` — storyboard.json → Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
 3. `/storyboard-generate 7,45` — row brief + brand → HyperFrames graphic (local) or Higgsfield B-roll, named by row.
+3b. `/storyboard-motion` — HyperFrames stills → HTML motion design sheet (approval gate) → animated Higgsfield clips.
 4. `/storyboard-handoff` — approved assets → `handoff/` named by row + manifest.csv, mirrored to Drive.
 
 ## Conventions
