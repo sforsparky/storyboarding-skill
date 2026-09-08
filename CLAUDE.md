@@ -31,8 +31,8 @@ from it. Edit the JSON (or the Sheet, then `/pull-feedback`), never treat the Sh
 - Activate the venv before running scripts: `. .venv/bin/activate`.
 - Generated video is always silent (the editor sets sound): prefer silent models, keep audio
   terms out of prompts, and strip any track with `generate_row.py silence <file>`.
-- `/generate span A-B` makes ONE clip covering a row range (each row gets an in/out segment);
-  `/generate series A-B` makes a style-linked set, one asset per row. See the generate skill.
+- `/generate clip A-B` makes ONE Higgsfield clip covering a row range (each row gets an in/out segment);
+  `/generate series A-B` makes one still image per row (previz frames that can later seed clips).
 
 ## Example / test case
 `projects/ic-vsl-2026/` is the Inner Circle VSL, extracted from `_example/` and used to validate the

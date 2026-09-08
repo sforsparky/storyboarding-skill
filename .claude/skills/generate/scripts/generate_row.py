@@ -42,7 +42,7 @@ def register(sb_path, n, file_rel, poster_rel, kind, source, duration=None,
     save(sb_path, doc)
     print(f"row {n}: {file_rel} ({status})" + (f" series={series_id}" if series_id else ""))
 
-def register_span(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, cuts=None):
+def register_clip(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, cuts=None):
     """Point every row in [a,b] at ONE shared file, each with its own in/out segment.
     cuts: optional explicit boundary times in seconds (len = rows+1). Otherwise split evenly."""
     a, b, total = int(a), int(b), float(total_dur)
@@ -56,14 +56,14 @@ def register_span(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, 
     else:
         step = total / k
         bounds = [round(i * step, 3) for i in range(k)] + [round(total, 3)]
-    span_group = f"span_{a:03d}_{b:03d}"
+    clip_group = f"clip_{a:03d}_{b:03d}"
     for i, r in enumerate(rows):
         r["assets"] = [{"file": file_rel, "poster": poster_rel, "kind": kind, "source": source,
                         "duration": round(bounds[i+1] - bounds[i], 3),
-                        "segment": [bounds[i], bounds[i+1]], "span_group": span_group}]
+                        "segment": [bounds[i], bounds[i+1]], "clip_group": clip_group}]
         r["status"] = "Generated"
     save(sb_path, doc)
-    print(f"span {span_group}: {file_rel} across rows {a}-{b}")
+    print(f"clip {clip_group}: {file_rel} across rows {a}-{b}")
     for i, r in enumerate(rows):
         print(f"  row {r['n']}: {bounds[i]:.2f}-{bounds[i+1]:.2f}s")
 
@@ -80,10 +80,10 @@ if __name__ == "__main__":
         register(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7],
                  sys.argv[8] if len(sys.argv) > 8 else None,
                  series_id=sys.argv[9] if len(sys.argv) > 9 else None)
-    elif cmd == "register_span":
-        # register_span <sb> <a> <b> <file> <poster> <kind> <source> <total_dur> [t0 t1 ...]
+    elif cmd == "register_clip":
+        # register_clip <sb> <a> <b> <file> <poster> <kind> <source> <total_dur> [t0 t1 ...]
         cuts = sys.argv[10:] or None
-        register_span(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6],
+        register_clip(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6],
                       sys.argv[7], sys.argv[8], sys.argv[9], cuts=cuts)
     else:
-        print("commands: download | silence | poster | register | register_span"); sys.exit(1)
+        print("commands: download | silence | poster | register | register_clip"); sys.exit(1)

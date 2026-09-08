@@ -22,8 +22,8 @@ def main():
         a = assets[0]
         src = os.path.join(proj, a["file"])
         ext = os.path.splitext(a["file"])[1].lstrip(".")
-        if a.get("span_group"):
-            dest_name = os.path.basename(a["file"])   # one shared file for the whole span
+        if a.get("clip_group"):
+            dest_name = os.path.basename(a["file"])   # one shared file for the whole clip
         else:
             dest_name = f"{r['n']:03d}_{r.get('slug','shot')}.{ext}"
         if os.path.exists(src):

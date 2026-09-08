@@ -4,7 +4,7 @@ description: >
   Generate the asset(s) for storyboard rows from their brief + brand kit. Custom graphics render
   locally via HyperFrames (replacing hand Adobe work); B-roll via Higgsfield (silent, no audio);
   talking-head/cutaway reuse a still; screencast gets a capture placeholder. Handles single rows,
-  lists, a whole visual type, a continuous asset spanning a row range, and a style-linked series.
+  lists, a whole visual type, a continuous Higgsfield clip spanning a row range, and a style-linked series of stills.
 ---
 
 # /generate — rows → asset(s)
@@ -13,8 +13,9 @@ Selection syntax:
 - `/generate 7` — one row.
 - `/generate 5,7,45` — several independent rows.
 - `/generate 43-46` — a range, each row generated independently.
-- `/generate span 43-46` — ONE continuous asset covering the range (see "Spanning rows").
-- `/generate series 50-56` — a style-linked SET, one asset per row that share look/continuity.
+- `/generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
+- `/generate series 50-56` — a still IMAGE per row across the range, storyboard/previz frames that
+  share a look and can later seed clips (see "Series of stills").
 - `/generate custom-graphic` — every row of that visual type.
 
 Route by `visual_type` (see `scripts/lib_types.py` GENERATED_BY_TYPE).
@@ -47,28 +48,32 @@ Every generated video is delivered with **no audio** — the video editor sets a
 2. Download to `assets/<NNN_slug>.mp4`, strip audio (`silence`), extract a poster PNG.
 3. Stock-first rows: write a shortlist of search terms to the row notes and drop a placeholder.
 
-## Spanning rows — one continuous asset across a range (`span A-B`)
-Use when consecutive rows are beats of a SINGLE continuous visual (an animation that builds across
-several script lines, or one unbroken b-roll take the editor will cut into). Produce ONE file and
-point every row in the range at it with its own in/out segment:
-1. Author/generate one asset long enough to cover the beats (graphic: one timeline with the beats
-   sequenced; b-roll: one longer clip or a multi-shot `seedance_2_5` generation).
-2. Name it by the FIRST row: `<AAA>_<slug>.mp4` (e.g. `043_market-cycle-build.mp4`).
-3. Register the span so each row references the shared file plus its segment:
-   `generate_row.py register_span <sb.json> <A> <B> <file_rel> <poster_rel> <kind> <source> <total_dur>`
+## Clip across rows — one Higgsfield clip covering a range (`clip A-B`)
+Use when consecutive rows are beats of a SINGLE continuous shot the editor will cut into. Generate
+ONE Higgsfield video clip long enough to cover the beats, then point every row in the range at it
+with its own in/out time:
+1. Build one prompt from the combined briefs of rows A-B + brand `broll_style`; generate a single
+   clip with `generate_video` (`seedance_2_5`, silent). Preflight cost with `get_cost:true`.
+2. Download, strip audio (`generate_row.py silence`), name it by the FIRST row:
+   `<AAA>_<slug>.mp4` (e.g. `043_market-cycle-build.mp4`), extract a poster.
+3. Register the clip so each row references the shared file plus its segment:
+   `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> b_roll higgsfield <total_dur>`
    splits the duration evenly across the rows, or pass explicit cut points as trailing
-   `t0 t1 t2 ...` seconds. Each row gets `assets:[{file, poster, segment:[in,out], span_group}]`.
-4. `/handoff` ships the single file once and lists each row's in/out in the manifest, so the editor
-   knows where each script beat falls inside the clip.
+   `t0 t1 t2 ...` seconds. Each row gets `assets:[{file, poster, segment:[in,out], clip_group}]`.
+4. `/handoff` ships the single clip once and lists each row's in/out in the manifest, so the editor
+   knows where each script beat falls inside it.
 
-## Series — style-linked set, one asset per row (`series A-B`)
-Use when each row needs its OWN shot but they must look like one sequence (same location, grade,
-character, or motif). Generate them together so continuity holds:
-1. Write per-row prompts that share a fixed style preamble from the brand kit (and, for people, a
-   reference image / character sheet so the subject is consistent).
-2. Submit as one `generate_video_batch`, `jobs_wait`, then one `show_generation_by_ids`.
-3. Download each to its own `<NNN_slug>.mp4`, silence, poster, and tag them with a common
-   `series_id` in each row's asset so they read as a set. Regenerating one keeps the shared preamble.
+## Series of stills — one image per row (`series A-B`)
+Use to storyboard a run of rows as STILL frames that share a look — previz you can approve fast and,
+later, feed into image-to-video to make clips. Each row gets its own still image, not a video:
+1. Write per-row image prompts that share a fixed style preamble from the brand kit (and, for
+   people, a reference image / character sheet so the subject stays consistent across the frames).
+2. Submit as one `generate_image_batch`, `jobs_wait`, then one `show_generation_by_ids`.
+3. Download each to `assets/<NNN_slug>.png`, and register with kind `still` and a shared `series_id`:
+   `generate_row.py register <sb.json> <n> <png_rel> <png_rel> still higgsfield "" <series_id>`
+   (the still is its own poster). Rows read as a set; regenerating one keeps the shared preamble.
+4. To turn an approved still into motion later, run `/generate clip` on that row (or range) using
+   the still as the start frame.
 
 ## TALKING HEAD / + LOWER THIRD / CUTAWAY → still (no generation)
 Copy the `reuse_of` row's still, or a labelled placeholder card if none yet.
