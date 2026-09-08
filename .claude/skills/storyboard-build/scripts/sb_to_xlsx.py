@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, normalize_type, STATUSES
 
 WRAP = Alignment(wrap_text=True, vertical="top", horizontal="left")

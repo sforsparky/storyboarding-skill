@@ -6,7 +6,7 @@ collaboration surface and the only shared state, Google Drive stores assets, Hyp
 custom graphics locally, and Higgsfield generates B-roll.
 
 ## Source of truth
-`projects/<name>/storyboard-build.json` is authoritative. The Sheet, the xlsx, and every asset derive
+`projects/<name>/storyboard.json` is authoritative. The Sheet, the xlsx, and every asset derive
 from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never treat the Sheet as the master.
 
 ## Layout
@@ -18,7 +18,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 
 ## Workflow
 0. `/storyboard-new <name> [--brand <brand>]` — scaffold projects/<name>/ (+ brand from template if new).
-0b. `/storyboard-brand` — drop reference assets in `brands/<brand>/refs/`; extracts palette + writes brand.json/storyboard-brand.md.
+0b. `/storyboard-brand` — drop reference assets in `brands/<brand>/refs/`; extracts palette + writes brand.json/brand.md.
 1. `/storyboard-build` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 2. `/storyboard-sheet` — storyboard.json → Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
 3. `/storyboard-generate 7,45` — row brief + brand → HyperFrames graphic (local) or Higgsfield B-roll, named by row.

@@ -12,7 +12,7 @@ dry run. In normal use Claude writes storyboard.json directly from a script usin
 the same schema and the rules in SKILL.md; the brief-writing here is the fallback.
 """
 import json, re, sys, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from lib_types import infer_type, TALKING_HEAD_TYPES, GENERATED_BY_TYPE
 
 def slug(text, n=4):

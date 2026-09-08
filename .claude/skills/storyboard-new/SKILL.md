@@ -13,7 +13,7 @@ Run: `scripts/scaffold.py <project-name> [--brand <brand>] [--title "Human Title
 It creates:
 - `projects/<name>/assets/` and `handoff/`
 - `projects/<name>/script.md` — a starter with a `## Hook` heading and a note on how beats/sections parse
-- `projects/<name>/storyboard-build.json` — an empty skeleton with `project` + `brand` set
+- `projects/<name>/storyboard.json` — an empty skeleton with `project` + `brand` set
 - `brands/<brand>/` from `brands/_template` **if the brand doesn't exist yet** (with `refs/` and `logos/`)
 
 Defaults: the brand name defaults to the project name; pass `--brand` to point at an existing brand

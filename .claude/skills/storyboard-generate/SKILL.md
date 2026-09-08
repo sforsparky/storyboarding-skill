@@ -18,7 +18,7 @@ Selection syntax:
   share a look and can later seed clips (see "Series of stills").
 - `/storyboard-generate custom-graphic` — every row of that visual type.
 
-Route by `visual_type` (see `scripts/lib_types.py` GENERATED_BY_TYPE).
+Route by `visual_type` (see `../storyboard-build/scripts/lib_types.py` GENERATED_BY_TYPE).
 
 ## Video is silent by default
 Every generated video is delivered with **no audio** — the video editor sets all sound and music.

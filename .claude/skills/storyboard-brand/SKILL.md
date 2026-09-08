@@ -3,7 +3,7 @@ name: storyboard-brand
 description: >
   Build or refine a brand's design system from reference assets the user drops in — no hand-editing
   JSON. Read logos, frames, screenshots, style tiles, and existing graphics from brands/<brand>/refs/,
-  extract an accurate color palette programmatically, and synthesize brands/<brand>/storyboard-brand.json plus a
+  extract an accurate color palette programmatically, and synthesize brands/<brand>/brand.json plus a
   human-readable brand.md. Use when starting a new brand or updating one from new references.
 ---
 

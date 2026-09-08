@@ -16,7 +16,7 @@ import json, os, sys
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..", ".."))
 SECRETS = os.path.join(ROOT, ".secrets")
 sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "storyboard-build", "scripts"))
 from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, STATUSES, normalize_type
