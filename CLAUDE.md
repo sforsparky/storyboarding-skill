@@ -12,7 +12,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 
 ## Layout
 - A **project folder** (anywhere) holds: `script.md`, `storyboard.json`, `assets/` (NNN_slug.mp4 + .png), `handoff/`, and `brands/<brand>/` (its own brand: `refs/`, `brand.json` + `brand.md`, `logos/`).
-- This **skills repo** holds the six skills and `brands/_template/` (the brand template new projects copy). `projects/ic-vsl-2026/` is a self-contained example project kept here as a fixture.
+- This **skills repo** holds the six skills and `brands/_template/` (the brand template new projects copy).
 - `.claude/skills/{storyboard-new,storyboard-brand,storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the workflow skills + scripts.
 - `.claude/skills/storyboard-generate/templates/` — reusable HyperFrames compositions (e.g. portfolio-bar-drop).
 - `.venv/` — Python deps (openpyxl, google-api-python-client). `.secrets/` — Google OAuth (gitignored).
@@ -36,6 +36,3 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 - `/storyboard-generate clip A-B` makes ONE Higgsfield clip covering a row range (each row gets an in/out segment);
   `/storyboard-generate series A-B` makes one still image per row (previz frames that can later seed clips).
 
-## Example / test case
-`projects/ic-vsl-2026/` is the Inner Circle VSL, extracted from `_example/` and used to validate the
-pipeline (102 rows, 8 sections). It is a test fixture, not a template — real projects get their own folder.

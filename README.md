@@ -24,5 +24,5 @@ See [CLAUDE.md](CLAUDE.md) for the full layout and conventions.
 
 ## Layout
 - A **project folder** (anywhere): `script.md`, `storyboard.json` (source of truth), `assets/`, `handoff/`, `brands/<brand>/` (its own brand).
-- This **repo**: the six `.claude/skills/storyboard-*` skills + `brands/_template/`. `projects/ic-vsl-2026/` is a self-contained example.
+- This **repo**: the six `.claude/skills/storyboard-*` skills + `brands/_template/`.
 - `.claude/skills/{storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the four workflow skills + scripts.
