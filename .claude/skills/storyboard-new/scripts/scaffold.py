@@ -1,74 +1,78 @@
 #!/usr/bin/env python3
-"""Scaffold a new storyboard project (and, if needed, its brand) in one step.
+"""Scaffold a storyboard project *in place* — inside the current folder.
 
-Creates projects/<name>/ with assets/, handoff/, a script.md starter, and a storyboard.json
-skeleton wired to a brand. If the brand folder does not exist yet, it is created from
-brands/_template so you can drop reference assets in and run /storyboard-brand. Safe: refuses to clobber an
-existing project.
+Run it from a folder you've already named for the project. It creates, in the CURRENT directory:
+  script.md, storyboard.json, assets/, handoff/, and brands/<brand>/ (from the template).
+Each project is self-contained: its brand lives inside it. The project name defaults to the
+folder name. Safe: refuses to clobber an existing storyboard.json, and refuses to run in $HOME
+or the skills repo itself.
 
-Usage:
-  scaffold.py <project-name> [--brand <brand>] [--title "Human Title"]
+The brand template ships with the skills, so this works from any folder (the skill scripts live
+in the storyboarding-app repo and are found via their real path even when run through a symlink).
+
+Usage (from inside the project folder):
+  scaffold.py [--brand <brand>] [--title "Human Title"] [--name <slug>]
 """
 import os, sys, json, shutil, re
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..", ".."))
+# repo that ships the skills (for the brand template) — resolved through any symlink
+SKILLS_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                           "..", "..", "..", ".."))
+TEMPLATE = os.path.join(SKILLS_REPO, "brands", "_template")
 
-def slugify(s):
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "project"
+def slugify(s): return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "project"
 
 def main():
     args = sys.argv[1:]
-    if not args:
-        print("usage: scaffold.py <project-name> [--brand <brand>] [--title \"Title\"]"); sys.exit(1)
-    name = slugify(args[0])
-    brand = None; title = None
-    if "--brand" in args: brand = slugify(args[args.index("--brand")+1])
-    if "--title" in args: title = args[args.index("--title")+1]
-    title = title or args[0]
-    brand = brand or name  # default: a brand named after the project
+    def opt(flag):
+        return args[args.index(flag)+1] if flag in args else None
+    cwd = os.getcwd()
+    home = os.path.expanduser("~")
+    if os.path.realpath(cwd) in (os.path.realpath(home), os.path.realpath(SKILLS_REPO)):
+        print(f"refusing to scaffold in {cwd!r}. cd into an empty project folder first."); sys.exit(1)
+    if os.path.exists(os.path.join(cwd, "storyboard.json")):
+        print("refusing to overwrite: storyboard.json already exists here."); sys.exit(1)
 
-    proj = os.path.join(ROOT, "projects", name)
-    if os.path.exists(proj):
-        print(f"refusing to overwrite existing project: projects/{name}"); sys.exit(1)
+    name = slugify(opt("--name") or os.path.basename(cwd.rstrip("/")))
+    title = opt("--title") or os.path.basename(cwd.rstrip("/"))
+    brand = slugify(opt("--brand") or name)
 
-    # project folders
     for sub in ("assets", "handoff"):
-        os.makedirs(os.path.join(proj, sub), exist_ok=True)
+        os.makedirs(os.path.join(cwd, sub), exist_ok=True)
 
-    # brand: create from template if missing
-    brand_dir = os.path.join(ROOT, "brands", brand)
+    # brand lives inside the project (per-project brands)
+    brand_dir = os.path.join(cwd, "brands", brand)
     brand_created = False
     if not os.path.exists(brand_dir):
-        tmpl = os.path.join(ROOT, "brands", "_template")
-        shutil.copytree(tmpl, brand_dir)
+        shutil.copytree(TEMPLATE, brand_dir)
         os.makedirs(os.path.join(brand_dir, "logos"), exist_ok=True)
-        bj_path = os.path.join(brand_dir, "brand.json")
-        bj = json.load(open(bj_path)); bj["brand_id"] = brand; bj["name"] = title
-        json.dump(bj, open(bj_path, "w"), indent=2)
+        bj = os.path.join(brand_dir, "brand.json")
+        d = json.load(open(bj)); d["brand_id"] = brand; d["name"] = title
+        json.dump(d, open(bj, "w"), indent=2)
         brand_created = True
 
-    # script.md starter
-    open(os.path.join(proj, "script.md"), "w").write(
+    open(os.path.join(cwd, "script.md"), "w").write(
         f"# {title} — script\n\n"
-        "<!-- Paste the finished script below. Use '## Hook', '## Close', etc. for sections; \n"
-        "     Claude will infer them if omitted. One blank line between beats helps the split. -->\n\n"
+        "<!-- Paste the finished script below. Use '## Hook', '## Close', etc. for sections;\n"
+        "     Claude infers them if omitted. One blank line between beats helps the split. -->\n\n"
         "## Hook\n\n\n")
 
-    # storyboard.json skeleton
-    doc = {"project": name, "brand": brand, "presenter": None,
-           "sheet_id": None, "drive_folder_id": None, "sections_order": [], "rows": []}
-    json.dump(doc, open(os.path.join(proj, "storyboard.json"), "w"), indent=2)
+    json.dump({"project": name, "brand": brand, "presenter": None,
+               "sheet_id": None, "drive_folder_id": None,
+               "sections_order": [], "rows": []},
+              open(os.path.join(cwd, "storyboard.json"), "w"), indent=2)
 
-    print(f"created projects/{name}/  (assets/, handoff/, script.md, storyboard.json)")
-    print(f"brand: brands/{brand}/" + ("  [new — from _template]" if brand_created else "  [existing]"))
-    print("\nnext:")
+    print(f"scaffolded project '{name}' in {cwd}")
+    print("  created: script.md, storyboard.json, assets/, handoff/, "
+          f"brands/{brand}/" + (" [new from template]" if brand_created else " [existing]"))
+    print("\nnext (run these from this folder):")
     if brand_created:
         print(f"  1. drop brand assets into brands/{brand}/refs/  then run:  /storyboard-brand {brand}")
-        print(f"  2. paste the script into projects/{name}/script.md")
-        print(f"  3. /storyboard-build for projects/{name} using brand {brand}")
+        print("  2. paste the script into script.md")
+        print("  3. /storyboard-build")
     else:
-        print(f"  1. paste the script into projects/{name}/script.md")
-        print(f"  2. /storyboard-build for projects/{name} using brand {brand}")
+        print("  1. paste the script into script.md")
+        print("  2. /storyboard-build")
 
 if __name__ == "__main__":
     main()

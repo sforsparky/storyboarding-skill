@@ -14,6 +14,7 @@ Node 22+ and FFmpeg are needed for graphic rendering (`npx hyperframes …`).
 For Sheets sync, drop a Google Desktop-OAuth client at `.secrets/credentials.json` (one-time).
 
 ## Workflow (Claude Code skills in `.claude/skills/`)
+0. `mkdir my-video && cd my-video` then `/storyboard-new` — scaffold the project in that folder.
 1. `/storyboard-build` — `script.md` → `storyboard.json` (rows, sections, visual types, briefs, reuse).
 2. `/storyboard-sheet` — push to a Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
 3. `/storyboard-generate 7` · `/storyboard-generate span 43-46` · `/storyboard-generate series 50-56` — briefs → graphics/B-roll, named by row.
@@ -22,6 +23,6 @@ For Sheets sync, drop a Google Desktop-OAuth client at `.secrets/credentials.jso
 See [CLAUDE.md](CLAUDE.md) for the full layout and conventions.
 
 ## Layout
-- `brands/<brand>/` — brand kit (`brand.json` + `logos/`); `_template/` to start a new one.
-- `projects/<name>/` — `script.md`, `storyboard.json` (source of truth), `assets/`, `handoff/`.
+- A **project folder** (anywhere): `script.md`, `storyboard.json` (source of truth), `assets/`, `handoff/`, `brands/<brand>/` (its own brand).
+- This **repo**: the six `.claude/skills/storyboard-*` skills + `brands/_template/`. `projects/ic-vsl-2026/` is a self-contained example.
 - `.claude/skills/{storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the four workflow skills + scripts.

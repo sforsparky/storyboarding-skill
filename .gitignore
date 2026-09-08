@@ -9,9 +9,11 @@ __pycache__/
 **/credentials.json
 
 # Generated / derived artifacts (regenerable from storyboard.json)
+# per-project generated/derived artifacts (regenerable)
 projects/*/assets/
 projects/*/handoff/
 projects/*/*.xlsx
+# in-place project folders elsewhere manage their own .gitignore
 
 # Large source example (test fixture, kept local)
 _example/

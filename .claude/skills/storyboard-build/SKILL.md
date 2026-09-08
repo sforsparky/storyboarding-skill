@@ -14,7 +14,7 @@ asset are derived from it. Never hand-edit the Sheet as the primary copy; edit t
 re-push.
 
 ## Steps
-1. Read `projects/<name>/script.md` and the project's brand at `brands/<brand>/brand.json`.
+1. Read `script.md` in the project folder and its brand at `brands/<brand>/brand.json`.
 2. Parse the script into rows using the vsl-storyboard rules: one row per **beat** (how an
    editor would cut), not per sentence. Keep short punchy standalone lines as their own rows;
    fold several short lines that share one visual into one row's `script` with `\n`. Preserve
@@ -29,7 +29,7 @@ re-push.
 5. Write a `brief` for every non-talking-head row: a generation-ready prompt naming subject,
    framing, motion, duration, and the brand's colors/motif/broll_style. Talking-head rows get
    an empty brief and empty direction/notes (the one exception is `cut_back`).
-6. Emit `projects/<name>/storyboard.json` with the schema below. Keep row `id` stable across
+6. Emit `storyboard.json` in the project folder with the schema below. Keep row `id` stable across
    re-runs so the Sheet updates in place and comments stay attached.
 
 ## Schema (per row)

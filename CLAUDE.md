@@ -6,18 +6,19 @@ collaboration surface and the only shared state, Google Drive stores assets, Hyp
 custom graphics locally, and Higgsfield generates B-roll.
 
 ## Source of truth
-`projects/<name>/storyboard.json` is authoritative. The Sheet, the xlsx, and every asset derive
+Each project is a **self-contained folder** (created in place by `/storyboard-new`). Its
+`storyboard.json` is authoritative. The Sheet, the xlsx, and every asset derive
 from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never treat the Sheet as the master.
 
 ## Layout
-- `brands/<brand>/` — `refs/` (drop assets here), `brand.json` + `brand.md` (built by /storyboard-brand), `logos/`. `_template/` to start one.
-- `projects/<name>/` — `script.md`, `storyboard.json`, `assets/` (NNN_slug.mp4 + .png), `handoff/`.
+- A **project folder** (anywhere) holds: `script.md`, `storyboard.json`, `assets/` (NNN_slug.mp4 + .png), `handoff/`, and `brands/<brand>/` (its own brand: `refs/`, `brand.json` + `brand.md`, `logos/`).
+- This **skills repo** holds the six skills and `brands/_template/` (the brand template new projects copy). `projects/ic-vsl-2026/` is a self-contained example project kept here as a fixture.
 - `.claude/skills/{storyboard-new,storyboard-brand,storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the workflow skills + scripts.
 - `.claude/skills/storyboard-generate/templates/` — reusable HyperFrames compositions (e.g. portfolio-bar-drop).
 - `.venv/` — Python deps (openpyxl, google-api-python-client). `.secrets/` — Google OAuth (gitignored).
 
 ## Workflow
-0. `/storyboard-new <name> [--brand <brand>]` — scaffold projects/<name>/ (+ brand from template if new).
+0. `mkdir <name> && cd <name>`, then `/storyboard-new [--brand <brand>]` — scaffolds the project in that folder (with its own brand from the template).
 0b. `/storyboard-brand` — drop reference assets in `brands/<brand>/refs/`; extracts palette + writes brand.json/brand.md.
 1. `/storyboard-build` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 2. `/storyboard-sheet` — storyboard.json → Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
