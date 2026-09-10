@@ -36,6 +36,12 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
   terms out of prompts, and strip any track with `generate_row.py silence <file>`.
 - `/storyboard-generate clip A-B` makes ONE Higgsfield clip covering a row range (each row gets an in/out segment);
   `/storyboard-generate series A-B` makes one still image per row (previz frames that can later seed clips).
+- Every row carries a `motion_engine` (`hyperframes` | `higgsfield` | `none`), set at build time
+  by `default_motion_engine()` in `lib_types.py`: information graphics → `hyperframes` (pixel-exact
+  text/data), atmospheric footage-from-still → `higgsfield` (image-to-video), captured footage
+  (talking head, screencast) → `none`. Never route text/number/chart rows through Higgsfield — i2v
+  warps fine text. It shows as an editable **Engine** column in the Sheet and drives `/storyboard-motion`;
+  a user override on a row is preserved on re-runs.
 - `/storyboard-generate custom-graphic` is context-aware: consecutive graphic rows that read as beats of
   the same visual are auto-grouped into ONE continuous HyperFrames graphic (registered like a clip, with
   per-row in/out segments); unrelated graphic rows render separately. It states the grouping it chose.
