@@ -23,6 +23,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
 1. `/storyboard-build` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 2. `/storyboard-sheet` — storyboard.json → Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
 3. `/storyboard-generate 7,45` — row brief + brand → HyperFrames graphic (local) or Higgsfield B-roll, named by row.
+   With NO selector it renders every free/local asset across the board and stops before paid Higgsfield rows (asks first).
 3b. `/storyboard-motion` — HyperFrames stills → HTML motion design sheet (approval gate) → animated Higgsfield clips.
 4. `/storyboard-handoff` — approved assets → `handoff/` named by row + manifest.csv, mirrored to Drive.
 

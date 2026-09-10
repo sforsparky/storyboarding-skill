@@ -67,6 +67,56 @@ def register_clip(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, 
     for i, r in enumerate(rows):
         print(f"  row {r['n']}: {bounds[i]:.2f}-{bounds[i+1]:.2f}s")
 
+
+EST_CREDITS_PER_CLIP = 5  # rough; exact cost is always preflighted with get_cost before spending
+
+def _routing():
+    import sys, os
+    build = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                         "..", "..", "storyboard-build", "scripts")
+    sys.path.insert(0, os.path.abspath(build))
+    from lib_types import GENERATED_BY_TYPE, normalize_type
+    return GENERATED_BY_TYPE, normalize_type
+
+def _route_of(row, GBT, norm):
+    try:
+        rt = GBT.get(norm(row["visual_type"]), "hyperframes")
+    except Exception:
+        rt = "hyperframes"
+    if rt == "video" and row.get("motion_engine") == "hyperframes":
+        rt = "hyperframes"   # per-row override renders a would-be video as a local graphic
+    return rt
+
+def plan(sb_path):
+    """Bucket the whole board for a no-arg /storyboard-generate: free/local rows to make now,
+    paid Higgsfield rows to confirm. Prints a readable plan; spends nothing."""
+    GBT, norm = _routing()
+    doc = load(sb_path)
+    local, paid, done = [], [], 0
+    for r in doc["rows"]:
+        if r.get("status") in ("Generated", "Approved"):
+            done += 1
+            continue
+        rt = _route_of(r, GBT, norm)
+        (paid if rt == "video" else local).append((r["n"], rt, r.get("slug", "")))
+    print("Board plan for " + sb_path + ":")
+    print("  generate now (free / local): " + str(len(local)) +
+          " row(s) - hyperframes graphics, still reuses, placeholders")
+    for n, rt, slug in local:
+        print("    row %3d  %-11s %s" % (n, rt, slug))
+    est = len(paid) * EST_CREDITS_PER_CLIP
+    print("")
+    print("  needs confirmation (Higgsfield B-roll, PAID): " + str(len(paid)) +
+          " row(s) ~ " + str(est) + " credits (est; exact cost preflighted)")
+    for n, rt, slug in paid:
+        print("    row %3d  video       %s" % (n, slug))
+    if done:
+        print("")
+        print("  already Generated/Approved (skipped): " + str(done) + " row(s)")
+    print("")
+    print("Generate the free rows now; ask before the paid rows (or run `/storyboard-generate b-roll`).")
+    return {"local": local, "paid": paid, "done": done, "est_credits": est}
+
 if __name__ == "__main__":
     cmd = sys.argv[1]
     if cmd == "download":
@@ -85,5 +135,7 @@ if __name__ == "__main__":
         cuts = sys.argv[10:] or None
         register_clip(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6],
                       sys.argv[7], sys.argv[8], sys.argv[9], cuts=cuts)
+    elif cmd == "plan":
+        plan(sys.argv[2])
     else:
-        print("commands: download | silence | poster | register | register_clip"); sys.exit(1)
+        print("commands: plan | download | silence | poster | register | register_clip"); sys.exit(1)

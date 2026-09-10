@@ -12,16 +12,31 @@ description: >
 # /storyboard-generate — rows → asset(s)
 
 Selection syntax:
+- `/storyboard-generate` — NO selector: whole-board default. Generate every free/local asset across
+  the board (HyperFrames graphics, still reuses, placeholders) and STOP before any paid Higgsfield
+  B-roll. See "Whole-board default" below.
 - `/storyboard-generate 7` — one row.
 - `/storyboard-generate 5,7,45` — several independent rows.
 - `/storyboard-generate 43-46` — a range, each row generated independently.
 - `/storyboard-generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
 - `/storyboard-generate series 50-56` — a still IMAGE per row across the range, storyboard/previz frames that
   share a look and can later seed clips (see "Series of stills").
+- `/storyboard-generate b-roll` — every Higgsfield B-roll/testimonial row (the paid rows), after cost preflight.
 - `/storyboard-generate custom-graphic` — every row of that visual type; consecutive graphic rows
   that read as one continuous graphic are auto-grouped (see the CUSTOM GRAPHIC route).
 
 Route by `visual_type` (see `../storyboard-build/scripts/lib_types.py` GENERATED_BY_TYPE).
+
+## Whole-board default (no selector)
+`/storyboard-generate` with no argument does NOT blindly render everything — it protects credits:
+1. Print the plan: `generate_row.py plan storyboard.json`. It buckets pending rows into free/local
+   (route `hyperframes` / `still` / `placeholder`, honoring any per-row `motion_engine: hyperframes`
+   override) versus paid Higgsfield (route `video`), and skips rows already `Generated`/`Approved`.
+2. Generate the free/local rows now — this is the "render all the infographics" pass, and it spends
+   nothing. Apply the custom-graphic grouping rules (consecutive graphic beats → one graphic).
+3. STOP before the paid rows. Show the user the Higgsfield B-roll list and the estimated credits,
+   and ask before generating them (or tell them to run `/storyboard-generate b-roll`). Only proceed
+   on an explicit yes, and preflight exact cost with `get_cost:true` at that point.
 
 ## Video is silent by default
 Every generated video is delivered with **no audio** — the video editor sets all sound and music.
@@ -102,4 +117,4 @@ A card naming the URL/screen to capture; the human records it.
 ## After generating
 - Name outputs `NNN_slug.ext` (three-digit row number) so `/storyboard-handoff` is a copy.
 - Write the asset into the row's `assets[]`, set `status` to `Generated`, re-run `/storyboard-sheet`.
-- `scripts/generate_row.py` holds download / silence / register / register_clip helpers.
+- `scripts/generate_row.py` holds plan / download / silence / register / register_clip helpers.
