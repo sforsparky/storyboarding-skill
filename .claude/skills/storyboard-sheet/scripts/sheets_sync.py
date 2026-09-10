@@ -19,9 +19,10 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..", ".."))
 SECRETS = os.path.join(ROOT, ".secrets")
 sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "storyboard-build", "scripts"))
-from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, STATUSES, normalize_type
+from lib_types import (VISUAL_TYPES, TALKING_HEAD_TYPES, STATUSES, normalize_type,
+                       MOTION_ENGINES, default_motion_engine)
 
-HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Status","Thumbnail","_rowid"]
+HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Status","Engine","Thumbnail","_rowid"]
 
 def _need(msg):
     print(msg); print("""
@@ -95,15 +96,16 @@ def build_rows(doc, proj_dir, drive, folder_id):
     for r in doc["rows"]:
         sec = r.get("section")
         if sec and sec != last_section:
-            values.append([f"▶ {sec}","","","","","","",""]); last_section=sec
+            values.append([f"▶ {sec}","","","","","","","",""]); last_section=sec
         vt = normalize_type(r["visual_type"])
         label = vt + (f" ↩{r['reuse_of']}" if r.get("reuse_of") else "")
         url = poster_url(r)
         thumb = f'=IMAGE("{url}")' if url else ""
+        engine = r.get("motion_engine") or default_motion_engine(vt)
         values.append([r["n"], label, r.get("script",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("visual_direction",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("notes",""),
-                       r.get("status","Draft"), thumb, r["id"]])
+                       r.get("status","Draft"), engine, thumb, r["id"]])
     return values
 
 def push(sb_path):
@@ -122,7 +124,7 @@ def push(sb_path):
     sheet0 = sheets.spreadsheets().get(spreadsheetId=sid).execute()["sheets"][0]["properties"]["sheetId"]
     reqs = [{"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":0,"endRowIndex":1},
              "cell":{"userEnteredFormat":{"textFormat":{"bold":True}}},"fields":"userEnteredFormat.textFormat.bold"}},
-            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":7,"endIndex":8},
+            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":8,"endIndex":9},
              "properties":{"hiddenByUser":True},"fields":"hiddenByUser"}}]
     for i,row in enumerate(values[1:], start=1):
         v = row[1]
@@ -136,6 +138,9 @@ def push(sb_path):
     # status data validation
     reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":5,"endColumnIndex":6},
         "rule":{"condition":{"type":"ONE_OF_LIST","values":[{"userEnteredValue":s} for s in STATUSES]},"showCustomUi":True}}})
+    # engine data validation (motion engine per row — editable in-sheet, read back on pull)
+    reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":6,"endColumnIndex":7},
+        "rule":{"condition":{"type":"ONE_OF_LIST","values":[{"userEnteredValue":e} for e in MOTION_ENGINES]},"showCustomUi":True}}})
     sheets.spreadsheets().batchUpdate(spreadsheetId=sid, body={"requests":reqs}).execute()
     json.dump(doc, open(sb_path,"w"), indent=2)
     print(f"pushed → https://docs.google.com/spreadsheets/d/{sid}/edit  ({len(doc['rows'])} rows)")
@@ -144,7 +149,7 @@ def pull(sb_path):
     doc = json.load(open(sb_path)); sheets, drive = get_services()
     sid = doc.get("sheet_id")
     if not sid: print("No sheet_id yet — run push first."); return
-    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:H").execute().get("values",[])
+    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:I").execute().get("values",[])
     hdr = vals[0]; ci = {h:i for i,h in enumerate(hdr)}
     by_id = {r["id"]: r for r in doc["rows"]}
     changed = 0
@@ -155,6 +160,10 @@ def pull(sb_path):
         note = row[ci["Notes"]] if len(row)>ci["Notes"] else ""
         status = row[ci["Status"]] if len(row)>ci["Status"] else ""
         if status and status != r.get("status"): r["status"]=status; changed+=1
+        if "Engine" in ci:
+            engine = (row[ci["Engine"]] if len(row)>ci["Engine"] else "").strip().lower()
+            if engine in MOTION_ENGINES and engine != r.get("motion_engine"):
+                r["motion_engine"]=engine; changed+=1
         if note and note not in [f.get("text") for f in r.get("feedback",[])]:
             r.setdefault("feedback",[]).append({"who":"sheet","when":None,"text":note}); changed+=1
     # Drive comments on poster files would be read here via drive.comments().list per file id.

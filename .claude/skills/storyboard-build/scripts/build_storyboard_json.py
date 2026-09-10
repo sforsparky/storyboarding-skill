@@ -13,7 +13,7 @@ the same schema and the rules in SKILL.md; the brief-writing here is the fallbac
 """
 import json, re, sys, os
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from lib_types import infer_type, TALKING_HEAD_TYPES, GENERATED_BY_TYPE
+from lib_types import infer_type, TALKING_HEAD_TYPES, GENERATED_BY_TYPE, default_motion_engine
 
 def slug(text, n=4):
     words = re.findall(r"[a-z0-9]+", (text or "").lower())
@@ -84,6 +84,7 @@ def main():
             "reuse_of": reuse_of,
             "slug": slug(direction or script),
             "brief": make_brief(vtype, script, direction, brand),
+            "motion_engine": default_motion_engine(vtype),
             "status": "Draft",
             "assets": [],
             "feedback": [],

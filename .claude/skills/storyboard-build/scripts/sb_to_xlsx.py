@@ -12,7 +12,7 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, normalize_type, STATUSES
+from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, normalize_type, STATUSES, default_motion_engine
 
 WRAP = Alignment(wrap_text=True, vertical="top", horizontal="left")
 CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
@@ -54,7 +54,10 @@ def main():
         vtype=normalize_type(row["visual_type"]); color=VISUAL_TYPES[vtype]
         zebra=PatternFill("solid",fgColor="F2F2F2") if i%2 else None
         cell(ws,r,"A",row["n"],align=CENTER,fill=zebra)
-        label=vtype+(f"\n↩ reuse {row['reuse_of']}" if row.get("reuse_of") else "")
+        eng = row.get("motion_engine") or default_motion_engine(vtype)
+        label = vtype
+        if row.get("reuse_of"): label += f"\n↩ reuse {row['reuse_of']}"
+        if eng and eng != "none": label += f"\n⚙ {eng}"
         cell(ws,r,"B",label,font=Font(bold=True,color="FFFFFF"),
              fill=PatternFill("solid",fgColor=color),align=CENTER)
         cell(ws,r,"C",row.get("script",""),fill=zebra)

@@ -36,15 +36,19 @@ def main():
             for k, v in [("Style ", s.get("style")), ("Text ", s.get("text_design")),
                          ("Angle ", s.get("camera_angle")), ("Move ", s.get("camera_move")),
                          ("Time ", f"{s.get('duration','?')}s")] if v)
+        eng = (s.get("engine") or "hyperframes").lower()
+        eng_label = "HyperFrames · exact" if eng == "hyperframes" else "Higgsfield · i2v"
+        eng_badge = f'<span class="eng eng-{esc(eng)}">{esc(eng_label)}</span>'
+        prompt_label = "Motion direction" if eng == "hyperframes" else "Higgsfield prompt"
         img = (f'<img src="{src}" alt="{esc(s.get("slug",""))}">' if src
                else f'<div class="missing">still not found: {esc(still)}</div>')
         cards.append(f'''
         <article class="card">
-          <div class="frame">{img}<span class="num">{i}</span></div>
+          <div class="frame">{img}<span class="num">{i}</span>{eng_badge}</div>
           <div class="body">
             <h2>{esc(s.get("slug") or s.get("id") or f"Shot {i}")}</h2>
             <div class="chips">{chips}</div>
-            <div class="prompt"><span>Higgsfield prompt</span><p>{esc(s.get("prompt"))}</p></div>
+            <div class="prompt"><span>{esc(prompt_label)}</span><p>{esc(s.get("prompt"))}</p></div>
           </div>
         </article>''')
 
@@ -67,6 +71,10 @@ def main():
   .frame .missing{{display:flex;align-items:center;justify-content:center;height:100%;color:#e5484d;font-size:13px;padding:12px;text-align:center}}
   .num{{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.6);color:#fff;
     width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700}}
+  .eng{{position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:999px;font-size:11px;
+    font-weight:700;letter-spacing:.3px;backdrop-filter:blur(6px);border:1px solid}}
+  .eng-hyperframes{{background:rgba(57,207,170,.18);color:#8ff0d3;border-color:rgba(57,207,170,.5)}}
+  .eng-higgsfield{{background:rgba(179,136,255,.16);color:#d9c6ff;border-color:rgba(179,136,255,.5)}}
   .body{{padding:16px}} .body h2{{margin:0 0 10px;font-size:16px}}
   .chips{{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}}
   .chip{{background:#0f1a15;border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px;color:var(--ink)}}

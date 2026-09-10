@@ -29,12 +29,21 @@ re-push.
 5. Write a `brief` for every non-talking-head row: a generation-ready prompt naming subject,
    framing, motion, duration, and the brand's colors/motif/broll_style. Talking-head rows get
    an empty brief and empty direction/notes (the one exception is `cut_back`).
-6. Emit `storyboard.json` in the project folder with the schema below. Keep row `id` stable across
+6. Set each row's `motion_engine` — how its still gets animated into a clip later (the
+   `/storyboard-motion` handoff). Default it from `visual_type` via `default_motion_engine()` in
+   `scripts/lib_types.py`: information graphics (`CUSTOM GRAPHIC`, `GRAPHIC / SCREENCAST`,
+   `B-ROLL / GRAPHIC`) → `hyperframes` (deterministic HTML/GSAP render, pixel-exact text/data);
+   atmospheric footage-from-still (`B-ROLL`, `TESTIMONIAL`) → `higgsfield` (image-to-video);
+   captured footage (`TALKING HEAD`, `TALKING HEAD + LOWER THIRD`, `SCREENCAST`) → `none`. Never
+   route text/number/chart graphics through `higgsfield` — i2v warps fine text and data. A user
+   can override any row's engine; preserve the override on re-runs.
+7. Emit `storyboard.json` in the project folder with the schema below. Keep row `id` stable across
    re-runs so the Sheet updates in place and comments stay attached.
 
 ## Schema (per row)
 `id` (r003), `n` (int), `section`, `visual_type`, `script`, `visual_direction`, `notes`,
-`reuse_of` (id|null), `slug`, `brief`, `status` (Draft|Generating|Generated|Approved|Reshoot),
+`reuse_of` (id|null), `slug`, `brief`, `motion_engine` (hyperframes|higgsfield|none),
+`status` (Draft|Generating|Generated|Approved|Reshoot),
 `assets` [{file, poster, kind, source, duration}], `feedback` [ {who, when, text} ].
 Top level: `project`, `brand`, `presenter`, `sheet_id`, `drive_folder_id`, `sections_order`, `rows`.
 

@@ -4,7 +4,9 @@ description: >
   Generate the asset(s) for storyboard rows from their brief + brand kit. Custom graphics render
   locally via HyperFrames (replacing hand Adobe work); B-roll via Higgsfield (silent, no audio);
   talking-head/cutaway reuse a still; screencast gets a capture placeholder. Handles single rows,
-  lists, a whole visual type, a continuous Higgsfield clip spanning a row range, and a style-linked series of stills.
+  lists, a whole visual type, a continuous Higgsfield clip spanning a row range, and a style-linked
+  series of stills. Consecutive custom-graphic rows are auto-grouped into one continuous graphic
+  when context says they're beats of the same visual.
 ---
 
 # /storyboard-generate — rows → asset(s)
@@ -16,7 +18,8 @@ Selection syntax:
 - `/storyboard-generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
 - `/storyboard-generate series 50-56` — a still IMAGE per row across the range, storyboard/previz frames that
   share a look and can later seed clips (see "Series of stills").
-- `/storyboard-generate custom-graphic` — every row of that visual type.
+- `/storyboard-generate custom-graphic` — every row of that visual type; consecutive graphic rows
+  that read as one continuous graphic are auto-grouped (see the CUSTOM GRAPHIC route).
 
 Route by `visual_type` (see `../storyboard-build/scripts/lib_types.py` GENERATED_BY_TYPE).
 
@@ -29,6 +32,21 @@ Every generated video is delivered with **no audio** — the video editor sets a
   `ffmpeg -i in -c:v copy -an out`). Do this before registering the asset.
 
 ## CUSTOM GRAPHIC / GRAPHIC-SCREENCAST → HyperFrames (local, no Adobe)
+0. **Decide grouping from context first** (applies to `custom-graphic`, ranges, and lists).
+   Scan the selected rows and merge a run of CONSECUTIVE custom-graphic rows into ONE continuous
+   graphic when context says they are beats of the same visual — e.g. the same chart/object
+   building or animating across the beats, a `visual_direction` that references the prior row
+   ("same graph, now…", "continues"), one sentence split across rows, or a mechanism explainer
+   where a single diagram evolves. Keep rows SEPARATE when the subject/data changes, a non-graphic
+   row (talking head / B-roll) interrupts the run, or a new section header begins. State the
+   grouping you chose (which rows became one graphic, and why) so the user can correct it.
+   - **Merged run →** author ONE composition whose single `paused` timeline sequences the beats;
+     render once named by the FIRST row (`<AAA>_slug.mp4`); register with the shared-clip helper
+     so each row carries its in/out segment:
+     `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> custom_graphic hyperframes <total_dur> [t0 t1 …]`
+     (pass the beat boundaries as the trailing cut points when you know them). `/storyboard-handoff`
+     then ships the one graphic and lists each row's in/out — same as a Higgsfield `clip`.
+   - **Standalone rows →** render each individually per the steps below.
 1. Pick or author a composition under `templates/<name>/index.html`. Start from a template (e.g.
    `portfolio-bar-drop`) or `npx hyperframes catalog --query "..."` then `npx hyperframes add`.
    Follow `/hyperframes-core` + `/hyperframes-animation`.
@@ -84,4 +102,4 @@ A card naming the URL/screen to capture; the human records it.
 ## After generating
 - Name outputs `NNN_slug.ext` (three-digit row number) so `/storyboard-handoff` is a copy.
 - Write the asset into the row's `assets[]`, set `status` to `Generated`, re-run `/storyboard-sheet`.
-- `scripts/generate_row.py` holds download / silence / register / register_span helpers.
+- `scripts/generate_row.py` holds download / silence / register / register_clip helpers.

@@ -36,4 +36,7 @@ from it. Edit the JSON (or the Sheet, then `/storyboard-sheet (pull)`), never tr
   terms out of prompts, and strip any track with `generate_row.py silence <file>`.
 - `/storyboard-generate clip A-B` makes ONE Higgsfield clip covering a row range (each row gets an in/out segment);
   `/storyboard-generate series A-B` makes one still image per row (previz frames that can later seed clips).
+- `/storyboard-generate custom-graphic` is context-aware: consecutive graphic rows that read as beats of
+  the same visual are auto-grouped into ONE continuous HyperFrames graphic (registered like a clip, with
+  per-row in/out segments); unrelated graphic rows render separately. It states the grouping it chose.
 

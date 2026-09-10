@@ -26,6 +26,22 @@ GENERATED_BY_TYPE = {  # which /generate route each visual type takes
     "TALKING HEAD": "still",
     "TALKING HEAD + LOWER THIRD": "still",
 }
+# Which motion engine animates this type's still into a clip (the /storyboard-motion handoff).
+#   hyperframes = deterministic HTML/CSS/GSAP render — pixel-exact text/data; DEFAULT for info graphics
+#   higgsfield  = image-to-video — organic/atmospheric shots with no exact text to protect
+#   none        = captured footage (talking head, screencast); not animated from a still
+MOTION_ENGINE_BY_TYPE = {
+    "CUSTOM GRAPHIC": "hyperframes",
+    "GRAPHIC / SCREENCAST": "hyperframes",
+    "B-ROLL / GRAPHIC": "hyperframes",   # mixed: protect any on-frame text/data
+    "B-ROLL": "higgsfield",
+    "TESTIMONIAL": "higgsfield",
+    "SCREENCAST": "none",
+    "TALKING HEAD": "none",
+    "TALKING HEAD + LOWER THIRD": "none",
+}
+MOTION_ENGINES = ["hyperframes", "higgsfield", "none"]
+
 STATUSES = ["Draft", "Generating", "Generated", "Approved", "Reshoot"]
 
 def normalize_type(vtype: str) -> str:
@@ -36,6 +52,14 @@ def normalize_type(vtype: str) -> str:
         if k.replace(" ", "") == key.replace(" ", ""):
             return k
     raise ValueError(f"Unknown visual_type: {vtype!r}")
+
+def default_motion_engine(vtype: str) -> str:
+    """The engine that animates this visual type's still (see MOTION_ENGINE_BY_TYPE).
+    Information graphics default to deterministic hyperframes so text/numbers stay exact."""
+    try:
+        return MOTION_ENGINE_BY_TYPE.get(normalize_type(vtype), "hyperframes")
+    except ValueError:
+        return "hyperframes"
 
 def infer_type(direction: str) -> str:
     """Best-effort visual type from a free-text visual-direction line."""
