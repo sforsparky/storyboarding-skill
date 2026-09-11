@@ -16,6 +16,8 @@ Selection syntax:
   the board (HyperFrames graphics, still reuses, placeholders) and STOP before any paid Higgsfield
   B-roll. See "Whole-board default" below.
 - `/storyboard-generate 7` — one row.
+- `/storyboard-generate 7 "make the bars taller, lean into the lime accent"` — regenerate row 7
+  with added guidance (see "Editing a generated row").
 - `/storyboard-generate 5,7,45` — several independent rows.
 - `/storyboard-generate 43-46` — a range, each row generated independently.
 - `/storyboard-generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
@@ -45,6 +47,19 @@ Every generated video is delivered with **no audio** — the video editor sets a
 - Never add music/voice/SFX terms to a prompt. Briefs already say "No audio (editor handles sound)".
 - After download, strip any audio track defensively: `generate_row.py silence <file>` (runs
   `ffmpeg -i in -c:v copy -an out`). Do this before registering the asset.
+
+## Editing a generated row (add guidance & regenerate)
+Trailing text after a single row (or short list) is refinement guidance for an already-
+generated row:
+1. Append it to the row so it persists and compounds across passes:
+   `generate_row.py add_feedback storyboard.json <n> "<guidance>"`.
+2. Regenerate that row, folding its `brief` PLUS every entry in `feedback[]` into the work —
+   the HyperFrames composition for a graphic row, or the Higgsfield prompt for a video row.
+   Later feedback supersedes earlier where they conflict; treat the newest as authoritative.
+3. `register` overwrites the row's `assets[]`, so the new asset replaces the old and status
+   returns to `Generated`. An explicit row selector regenerates even a `Generated`/`Approved`
+   row (unlike the no-arg whole-board default, which skips them).
+Re-render the board xlsx afterward so the new thumbnail shows.
 
 ## CUSTOM GRAPHIC / GRAPHIC-SCREENCAST → HyperFrames (local, no Adobe)
 0. **Decide grouping from context first** (applies to `custom-graphic`, ranges, and lists).
@@ -118,4 +133,4 @@ A card naming the URL/screen to capture; the human records it.
 - Name outputs `NNN_slug.ext` (three-digit row number) so `assets/` is easy to share with the editor.
 - Write the asset into the row's `assets[]`, set `status` to `Generated`, and re-render the board xlsx
   (`/storyboard-build`, or `sb_to_xlsx.py storyboard.json <out>.xlsx`) so the new thumbnail shows.
-- `scripts/generate_row.py` holds plan / download / silence / register / register_clip helpers.
+- `scripts/generate_row.py` holds plan / add_feedback / download / silence / register / register_clip helpers.

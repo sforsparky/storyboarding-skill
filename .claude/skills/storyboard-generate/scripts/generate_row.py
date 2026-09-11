@@ -32,6 +32,16 @@ def poster_from(video_path, at="0.5"):
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return png
 
+
+def add_feedback(sb_path, n, text, who="user"):
+    """Append refinement guidance to a row's feedback[] so a regenerate can fold it in and later
+    passes compound. Returns the full feedback list for the row."""
+    doc = load(sb_path); row = row_by_n(doc, n)
+    row.setdefault("feedback", []).append({"who": who, "when": None, "text": text})
+    save(sb_path, doc)
+    print(f"row {n}: +feedback ({len(row['feedback'])} total): {text}")
+    return row["feedback"]
+
 def register(sb_path, n, file_rel, poster_rel, kind, source, duration=None,
              status="Generated", series_id=None):
     doc = load(sb_path); row = row_by_n(doc, n)
@@ -137,5 +147,7 @@ if __name__ == "__main__":
                       sys.argv[7], sys.argv[8], sys.argv[9], cuts=cuts)
     elif cmd == "plan":
         plan(sys.argv[2])
+    elif cmd == "add_feedback":
+        add_feedback(sys.argv[2], int(sys.argv[3]), sys.argv[4])
     else:
-        print("commands: plan | download | silence | poster | register | register_clip"); sys.exit(1)
+        print("commands: plan | add_feedback | download | silence | poster | register | register_clip"); sys.exit(1)
