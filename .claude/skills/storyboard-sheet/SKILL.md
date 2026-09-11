@@ -19,12 +19,14 @@ from `storyboard.json` and reads feedback back into it. Nothing is hosted.
 ## Push
 `scripts/sheets_sync.py push storyboard.json`  (run from the project folder)
 - Creates the Sheet on first run and stores `sheet_id` + `drive_folder_id` back into the JSON.
-- Columns: Line #, Visual, Script, Visual Direction, Notes, Status, Engine, plus a hidden
-  Row-ID column so re-pushes update in place (comments stay attached, no renumbering).
-- Writes `▶ SECTION` header rows, applies the legend colors to the Visual column, sets Status
-  data-validation (Draft/Generating/Generated/Approved/Reshoot) and Engine data-validation
-  (hyperframes/higgsfield/none — the `/storyboard-motion` engine per row, defaulted from the
-  visual type but editable in-sheet).
+- Columns: Line #, Visual, Script, Visual Direction, Notes, Engine, plus a hidden Row-ID column so
+  re-pushes update in place (comments stay attached, no renumbering). No Status column — status
+  lives in `storyboard.json` (set by `/storyboard-generate`) and is not edited in the Sheet.
+- Writes `▶ SECTION` header rows, applies the legend colors to the Visual column, and sets Engine
+  data-validation (hyperframes/higgsfield/none — the `/storyboard-motion` engine per row, defaulted
+  from the visual type but editable in-sheet).
+- Each push first resets the sheet's formatting, validations and hidden columns, so re-pushing an
+  existing board after a layout change (e.g. removing a column) rebuilds it cleanly.
 - The thumbnail lives IN the Visual cell: once a row has a poster, its Visual cell becomes
   `=IMAGE("<drive url>")` (poster uploaded to the project's Drive), replacing the type label; the
   row is given a 16:9 height and the type color stays as the cell background. Rows with no asset yet
@@ -36,9 +38,9 @@ from `storyboard.json` and reads feedback back into it. Nothing is hosted.
 `scripts/sheets_sync.py pull storyboard.json`  (run from the project folder)
 - Reads the Notes column and the Drive comments API, appends new items to each row's `feedback[]`
   keyed by Row-ID, so the next `/storyboard-generate` includes reviewer feedback in the prompt.
-- Also reads the Status and Engine columns back: a valid in-sheet edit to Engine
-  (hyperframes/higgsfield/none) overwrites the row's `motion_engine`, so a reviewer can redirect a
-  shot's motion route without touching the JSON.
+- Also reads the Engine column back: a valid in-sheet edit to Engine (hyperframes/higgsfield/none)
+  overwrites the row's `motion_engine`, so a reviewer can redirect a shot's motion route without
+  touching the JSON. (A legacy sheet that still has a Status column is read too; new sheets omit it.)
 
 ## Notes
 - Client stays a Desktop OAuth app; no service account, no shared secret to rotate.

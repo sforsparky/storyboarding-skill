@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "storyboard-build", "
 from lib_types import (VISUAL_TYPES, TALKING_HEAD_TYPES, STATUSES, normalize_type,
                        MOTION_ENGINES, default_motion_engine)
 
-HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Status","Engine","_rowid"]
+HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Engine","_rowid"]
 
 def _need(msg):
     print(msg); print("""
@@ -97,7 +97,7 @@ def build_rows(doc, proj_dir, drive, folder_id):
     for r in doc["rows"]:
         sec = r.get("section")
         if sec and sec != last_section:
-            values.append([f"▶ {sec}","","","","","","",""]); types.append(None); last_section=sec
+            values.append([f"▶ {sec}","","","","","",""]); types.append(None); last_section=sec
         vt = normalize_type(r["visual_type"])
         label = vt + (f" ↩{r['reuse_of']}" if r.get("reuse_of") else "")
         url = poster_url(r)
@@ -107,7 +107,7 @@ def build_rows(doc, proj_dir, drive, folder_id):
         values.append([r["n"], visual, r.get("script",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("visual_direction",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("notes",""),
-                       r.get("status","Draft"), engine, r["id"]])
+                       engine, r["id"]])
         types.append((vt, bool(url)))
     return values, types
 
@@ -125,9 +125,14 @@ def push(sb_path):
         valueInputOption="USER_ENTERED", body={"values": values}).execute()
     # color the Visual column per type + hide the rowid column
     sheet0 = sheets.spreadsheets().get(spreadsheetId=sid).execute()["sheets"][0]["properties"]["sheetId"]
-    reqs = [{"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":0,"endRowIndex":1},
+    # reset formatting/validation/hidden state first so a re-push after a layout change is clean
+    reqs = [{"repeatCell":{"range":{"sheetId":sheet0},"cell":{"userEnteredFormat":{}},"fields":"userEnteredFormat"}},
+            {"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1}}},
+            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":0,"endIndex":26},
+             "properties":{"hiddenByUser":False},"fields":"hiddenByUser"}},
+            {"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":0,"endRowIndex":1},
              "cell":{"userEnteredFormat":{"textFormat":{"bold":True}}},"fields":"userEnteredFormat.textFormat.bold"}},
-            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":7,"endIndex":8},
+            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":6,"endIndex":7},
              "properties":{"hiddenByUser":True},"fields":"hiddenByUser"}}]
     # widen the Visual column so the in-cell thumbnail is legible
     reqs.append({"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":1,"endIndex":2},
@@ -148,11 +153,8 @@ def push(sb_path):
             # give rows with a thumbnail a 16:9-friendly height
             reqs.append({"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"ROWS",
                 "startIndex":i,"endIndex":i+1},"properties":{"pixelSize":135},"fields":"pixelSize"}})
-    # status data validation
-    reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":5,"endColumnIndex":6},
-        "rule":{"condition":{"type":"ONE_OF_LIST","values":[{"userEnteredValue":s} for s in STATUSES]},"showCustomUi":True}}})
     # engine data validation (motion engine per row — editable in-sheet, read back on pull)
-    reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":6,"endColumnIndex":7},
+    reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":5,"endColumnIndex":6},
         "rule":{"condition":{"type":"ONE_OF_LIST","values":[{"userEnteredValue":e} for e in MOTION_ENGINES]},"showCustomUi":True}}})
     sheets.spreadsheets().batchUpdate(spreadsheetId=sid, body={"requests":reqs}).execute()
     json.dump(doc, open(sb_path,"w"), indent=2)
@@ -162,7 +164,7 @@ def pull(sb_path):
     doc = json.load(open(sb_path)); sheets, drive = get_services()
     sid = doc.get("sheet_id")
     if not sid: print("No sheet_id yet — run push first."); return
-    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:H").execute().get("values",[])
+    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:G").execute().get("values",[])
     hdr = vals[0]; ci = {h:i for i,h in enumerate(hdr)}
     by_id = {r["id"]: r for r in doc["rows"]}
     changed = 0
@@ -171,8 +173,9 @@ def pull(sb_path):
         if rid not in by_id: continue
         r = by_id[rid]
         note = row[ci["Notes"]] if len(row)>ci["Notes"] else ""
-        status = row[ci["Status"]] if len(row)>ci["Status"] else ""
-        if status and status != r.get("status"): r["status"]=status; changed+=1
+        if "Status" in ci:
+            status = row[ci["Status"]] if len(row)>ci["Status"] else ""
+            if status and status != r.get("status"): r["status"]=status; changed+=1
         if "Engine" in ci:
             engine = (row[ci["Engine"]] if len(row)>ci["Engine"] else "").strip().lower()
             if engine in MOTION_ENGINES and engine != r.get("motion_engine"):
