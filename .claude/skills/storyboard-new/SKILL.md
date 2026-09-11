@@ -2,7 +2,7 @@
 name: storyboard-new
 description: >
   Scaffold a self-contained storyboard project IN THE CURRENT FOLDER — a script.md starter, an empty
-  storyboard.json wired to a brand, assets/, handoff/, and a brands/<brand>/ copied from the template.
+  storyboard.json wired to a brand, assets/, and a brands/<brand>/ copied from the template.
   Run it inside a folder named for the project. Use when starting a new video before /storyboard-build.
 ---
 
@@ -12,7 +12,7 @@ Run it **from inside the project folder** (a folder you've named for the project
 `scripts/scaffold.py [--brand <brand>] [--title "Human Title"] [--name <slug>]`
 
 It creates:
-- `assets/` and `handoff/` in the current folder
+- `assets/` in the current folder
 - `script.md` — a starter with a `## Hook` heading and a note on how beats/sections parse
 - `storyboard.json` — an empty skeleton with `project` + `brand` set
 - `brands/<brand>/` — the project's own brand, copied from the skills' `_template`
@@ -28,4 +28,4 @@ are slugified. It refuses to overwrite an existing `storyboard.json`, or to run 
 - Existing brand → skip straight ahead.
 - Paste the script into `script.md`, then run `/storyboard-build` from this folder.
 
-This is step 0 of the pipeline; `/storyboard-build` → `/storyboard-sheet` → `/storyboard-generate` → `/storyboard-handoff` follow.
+This is step 0 of the pipeline; `/storyboard-brand` → `/storyboard-build` → `/storyboard-generate` → `/storyboard-motion` follow. Open the rendered `.xlsx` in Google Sheets to review; share `assets/` clips with the editor.

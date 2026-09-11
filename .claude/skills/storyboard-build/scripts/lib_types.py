@@ -26,7 +26,7 @@ GENERATED_BY_TYPE = {  # which /generate route each visual type takes
     "TALKING HEAD": "still",
     "TALKING HEAD + LOWER THIRD": "still",
 }
-# Which motion engine animates this type's still into a clip (the /storyboard-motion handoff).
+# Which motion engine animates this type's still into a clip (the /storyboard-motion step).
 #   hyperframes = deterministic HTML/CSS/GSAP render — pixel-exact text/data; DEFAULT for info graphics
 #   higgsfield  = image-to-video — organic/atmospheric shots with no exact text to protect
 #   none        = captured footage (talking head, screencast); not animated from a still

@@ -16,14 +16,13 @@ For Sheets sync, drop a Google Desktop-OAuth client at `.secrets/credentials.jso
 ## Workflow (Claude Code skills in `.claude/skills/`)
 0. `mkdir my-video && cd my-video` then `/storyboard-new` — scaffold the project in that folder.
 1. `/storyboard-build` — `script.md` → `storyboard.json` (rows, sections, visual types, briefs, reuse).
-2. `/storyboard-sheet` — push to a Google Sheet the team reviews in; `/storyboard-sheet (pull)` reads notes/status back.
 3. `/storyboard-generate 7` · `/storyboard-generate span 43-46` · `/storyboard-generate series 50-56` — briefs → graphics/B-roll, named by row.
 3b. `/storyboard-motion` — animate approved infographic stills into clips (builds an HTML motion sheet for approval first).
-4. `/storyboard-handoff` — approved assets → `handoff/` named by row + `manifest.csv`, mirrored to Drive.
+4. Open the rendered `.xlsx` in Google Sheets to review; share the `assets/` clips with your editor.
 
 See [CLAUDE.md](CLAUDE.md) for the full layout and conventions.
 
 ## Layout
-- A **project folder** (anywhere): `script.md`, `storyboard.json` (source of truth), `assets/`, `handoff/`, `brands/<brand>/` (its own brand).
+- A **project folder** (anywhere): `script.md`, `storyboard.json` (source of truth), `assets/` (clips + rendered board `.xlsx`), `brands/<brand>/` (its own brand).
 - This **repo**: the six `.claude/skills/storyboard-*` skills + `brands/_template/`.
-- `.claude/skills/{storyboard-build,storyboard-sheet,storyboard-generate,storyboard-handoff}/` — the four workflow skills + scripts.
+- `.claude/skills/storyboard-*` — the five workflow skills + scripts.

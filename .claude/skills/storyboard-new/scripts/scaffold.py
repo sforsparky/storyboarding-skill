@@ -2,7 +2,7 @@
 """Scaffold a storyboard project *in place* — inside the current folder.
 
 Run it from a folder you've already named for the project. It creates, in the CURRENT directory:
-  script.md, storyboard.json, assets/, handoff/, and brands/<brand>/ (from the template).
+  script.md, storyboard.json, assets/, and brands/<brand>/ (from the template).
 Each project is self-contained: its brand lives inside it. The project name defaults to the
 folder name. Safe: refuses to clobber an existing storyboard.json, and refuses to run in $HOME
 or the skills repo itself.
@@ -37,7 +37,7 @@ def main():
     title = opt("--title") or os.path.basename(cwd.rstrip("/"))
     brand = slugify(opt("--brand") or name)
 
-    for sub in ("assets", "handoff"):
+    for sub in ("assets",):
         os.makedirs(os.path.join(cwd, sub), exist_ok=True)
 
     # brand lives inside the project (per-project brands)
@@ -63,7 +63,7 @@ def main():
               open(os.path.join(cwd, "storyboard.json"), "w"), indent=2)
 
     print(f"scaffolded project '{name}' in {cwd}")
-    print("  created: script.md, storyboard.json, assets/, handoff/, "
+    print("  created: script.md, storyboard.json, assets/, "
           f"brands/{brand}/" + (" [new from template]" if brand_created else " [existing]"))
     print("\nnext (run these from this folder):")
     if brand_created:

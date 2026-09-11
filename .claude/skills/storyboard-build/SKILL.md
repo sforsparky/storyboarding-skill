@@ -4,7 +4,7 @@ description: >
   Turn a finished VSL/video script into a project storyboard.json — the single source of
   truth for a board (rows with visual type, section, script, direction, notes, per-row
   generation brief, talking-head reuse, status, assets, feedback). Use when a new script
-  arrives or a script changes. Also renders an offline .xlsx fallback.
+  arrives or a script changes. Also renders the board as an .xlsx you open in Google Sheets.
 ---
 
 # /storyboard-build — script → storyboard.json
@@ -30,7 +30,7 @@ re-push.
    framing, motion, duration, and the brand's colors/motif/broll_style. Talking-head rows get
    an empty brief and empty direction/notes (the one exception is `cut_back`).
 6. Set each row's `motion_engine` — how its still gets animated into a clip later (the
-   `/storyboard-motion` handoff). Default it from `visual_type` via `default_motion_engine()` in
+   `/storyboard-motion` step). Default it from `visual_type` via `default_motion_engine()` in
    `scripts/lib_types.py`: information graphics (`CUSTOM GRAPHIC`, `GRAPHIC / SCREENCAST`,
    `B-ROLL / GRAPHIC`) → `hyperframes` (deterministic HTML/GSAP render, pixel-exact text/data);
    atmospheric footage-from-still (`B-ROLL`, `TESTIMONIAL`) → `higgsfield` (image-to-video);
@@ -55,4 +55,4 @@ re-imports). `scripts/lib_types.py` is the shared type vocabulary — import it,
 ## Offline xlsx
 `scripts/sb_to_xlsx.py <storyboard.json> <out.xlsx>` renders a formatted workbook (section rows,
 Status column, embedded posters, legend) for anyone without Google access. The live Sheet from
-`/storyboard-sheet` is the primary collaboration surface.
+The rendered `.xlsx` (opened in Google Sheets) is the collaboration surface — it embeds thumbnails in the Visual cell.

@@ -59,8 +59,8 @@ Every generated video is delivered with **no audio** — the video editor sets a
      render once named by the FIRST row (`<AAA>_slug.mp4`); register with the shared-clip helper
      so each row carries its in/out segment:
      `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> custom_graphic hyperframes <total_dur> [t0 t1 …]`
-     (pass the beat boundaries as the trailing cut points when you know them). `/storyboard-handoff`
-     then ships the one graphic and lists each row's in/out — same as a Higgsfield `clip`.
+     (pass the beat boundaries as the trailing cut points when you know them). The one graphic is shared
+     once and each row carries its in/out — same as a Higgsfield `clip`.
    - **Standalone rows →** render each individually per the steps below.
 1. Pick or author a composition under `templates/<name>/index.html`. Start from a template (e.g.
    `portfolio-bar-drop`) or `npx hyperframes catalog --query "..."` then `npx hyperframes add`.
@@ -93,8 +93,8 @@ with its own in/out time:
    `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> b_roll higgsfield <total_dur>`
    splits the duration evenly across the rows, or pass explicit cut points as trailing
    `t0 t1 t2 ...` seconds. Each row gets `assets:[{file, poster, segment:[in,out], clip_group}]`.
-4. `/storyboard-handoff` ships the single clip once and lists each row's in/out in the manifest, so the editor
-   knows where each script beat falls inside it.
+4. The single clip is shared once and each row carries its in/out, so the editor knows where each
+   script beat falls inside it.
 
 ## Series of stills — one image per row (`series A-B`)
 Use to storyboard a run of rows as STILL frames that share a look — previz you can approve fast and,
@@ -115,6 +115,7 @@ Copy the `reuse_of` row's still, or a labelled placeholder card if none yet.
 A card naming the URL/screen to capture; the human records it.
 
 ## After generating
-- Name outputs `NNN_slug.ext` (three-digit row number) so `/storyboard-handoff` is a copy.
-- Write the asset into the row's `assets[]`, set `status` to `Generated`, re-run `/storyboard-sheet`.
+- Name outputs `NNN_slug.ext` (three-digit row number) so `assets/` is easy to share with the editor.
+- Write the asset into the row's `assets[]`, set `status` to `Generated`, and re-render the board xlsx
+  (`/storyboard-build`, or `sb_to_xlsx.py storyboard.json <out>.xlsx`) so the new thumbnail shows.
 - `scripts/generate_row.py` holds plan / download / silence / register / register_clip helpers.

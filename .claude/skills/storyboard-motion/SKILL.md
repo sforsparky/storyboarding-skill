@@ -87,7 +87,7 @@ Per approved shot, image-to-video with the still as the start frame:
 
 ### Register (both engines)
 If a shot is tied to a storyboard row, register the clip in that row's `assets[]` with kind `motion`
-and set status `Generated`; re-run `/storyboard-sheet`.
+and set status `Generated`; re-render the board xlsx (`/storyboard-build`) so the new thumbnail shows.
 
 ## shots.json schema
 ```json
