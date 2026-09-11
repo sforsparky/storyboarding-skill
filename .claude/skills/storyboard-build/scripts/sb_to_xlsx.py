@@ -16,8 +16,8 @@ from lib_types import VISUAL_TYPES, TALKING_HEAD_TYPES, normalize_type, default_
 WRAP = Alignment(wrap_text=True, vertical="top", horizontal="left")
 CENTER = Alignment(wrap_text=True, vertical="center", horizontal="center")
 COLS = {"A":"Line #","B":"Visual","C":"Script","D":"Visual Direction","E":"Notes","F":"Engine"}
-WIDTHS = {"A":7,"B":28,"C":46,"D":40,"E":28,"F":14}
-ROW_H = 96
+WIDTHS = {"A":7,"B":32,"C":46,"D":40,"E":28,"F":14}
+ROW_H = 97   # points; sized so the Visual cell is ~16:9 and a thumbnail fills it
 
 def cell(ws,r,c,v,font=None,fill=None,align=WRAP):
     x=ws[f"{c}{r}"]; x.value=v; x.alignment=align
@@ -62,8 +62,10 @@ def main():
              fill=PatternFill("solid",fgColor=color),align=CENTER)
         if poster and os.path.exists(poster):
             try:
-                img=XLImage(poster); img.height=ROW_H-8; img.width=int((ROW_H-8)*16/9)
-                ws.add_image(img,f"B{r}")
+                img=XLImage(poster)
+                img.width  = int(WIDTHS["B"]*7) + 5     # column B width in px
+                img.height = int(ROW_H*4/3)             # row height (pt) in px
+                ws.add_image(img,f"B{r}")               # fills the Visual cell edge-to-edge
             except Exception: pass
         cell(ws,r,"C",row.get("script",""),fill=zebra)
         cell(ws,r,"D",row.get("visual_direction","") if vtype not in TALKING_HEAD_TYPES else "",
