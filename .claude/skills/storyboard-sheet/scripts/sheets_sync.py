@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "storyboard-build", "
 from lib_types import (VISUAL_TYPES, TALKING_HEAD_TYPES, STATUSES, normalize_type,
                        MOTION_ENGINES, default_motion_engine)
 
-HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Status","Engine","Thumbnail","_rowid"]
+HEADERS = ["Line #","Visual","Script","Visual Direction","Notes","Status","Engine","_rowid"]
 
 def _need(msg):
     print(msg); print("""
@@ -93,20 +93,23 @@ def build_rows(doc, proj_dir, drive, folder_id):
                 if os.path.exists(p) and drive and folder_id:
                     url = upload_poster(drive, folder_id, p); poster_cache[p]=url; return url
         return ""
+    types = []
     for r in doc["rows"]:
         sec = r.get("section")
         if sec and sec != last_section:
-            values.append([f"▶ {sec}","","","","","","","",""]); last_section=sec
+            values.append([f"▶ {sec}","","","","","","",""]); types.append(None); last_section=sec
         vt = normalize_type(r["visual_type"])
         label = vt + (f" ↩{r['reuse_of']}" if r.get("reuse_of") else "")
         url = poster_url(r)
-        thumb = f'=IMAGE("{url}")' if url else ""
+        # the thumbnail REPLACES the type label in the Visual cell once it exists
+        visual = f'=IMAGE("{url}")' if url else label
         engine = r.get("motion_engine") or default_motion_engine(vt)
-        values.append([r["n"], label, r.get("script",""),
+        values.append([r["n"], visual, r.get("script",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("visual_direction",""),
                        "" if vt in TALKING_HEAD_TYPES else r.get("notes",""),
-                       r.get("status","Draft"), engine, thumb, r["id"]])
-    return values
+                       r.get("status","Draft"), engine, r["id"]])
+        types.append((vt, bool(url)))
+    return values, types
 
 def push(sb_path):
     doc = json.load(open(sb_path)); proj_dir = os.path.dirname(os.path.abspath(sb_path))
@@ -116,7 +119,7 @@ def push(sb_path):
         ss = sheets.spreadsheets().create(body={"properties":{"title":f"Storyboard — {doc.get('project')}"}}).execute()
         doc["sheet_id"] = ss["spreadsheetId"]
     sid = doc["sheet_id"]
-    values = build_rows(doc, proj_dir, drive, folder_id)
+    values, types = build_rows(doc, proj_dir, drive, folder_id)
     sheets.spreadsheets().values().clear(spreadsheetId=sid, range="A:Z").execute()
     sheets.spreadsheets().values().update(spreadsheetId=sid, range="A1",
         valueInputOption="USER_ENTERED", body={"values": values}).execute()
@@ -124,17 +127,27 @@ def push(sb_path):
     sheet0 = sheets.spreadsheets().get(spreadsheetId=sid).execute()["sheets"][0]["properties"]["sheetId"]
     reqs = [{"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":0,"endRowIndex":1},
              "cell":{"userEnteredFormat":{"textFormat":{"bold":True}}},"fields":"userEnteredFormat.textFormat.bold"}},
-            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":8,"endIndex":9},
+            {"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":7,"endIndex":8},
              "properties":{"hiddenByUser":True},"fields":"hiddenByUser"}}]
-    for i,row in enumerate(values[1:], start=1):
-        v = row[1]
-        for t,hexc in VISUAL_TYPES.items():
-            if isinstance(v,str) and v.startswith(t):
-                reqs.append({"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":i,"endRowIndex":i+1,
-                    "startColumnIndex":1,"endColumnIndex":2},
-                    "cell":{"userEnteredFormat":{"backgroundColor":hex_to_rgb(hexc),
-                        "textFormat":{"foregroundColor":{"red":1,"green":1,"blue":1},"bold":True}}},
-                    "fields":"userEnteredFormat(backgroundColor,textFormat)"}}); break
+    # widen the Visual column so the in-cell thumbnail is legible
+    reqs.append({"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"COLUMNS","startIndex":1,"endIndex":2},
+        "properties":{"pixelSize":240},"fields":"pixelSize"}})
+    for i, t in enumerate(types, start=1):
+        if not t:
+            continue   # section header row
+        vt, has_img = t
+        hexc = VISUAL_TYPES.get(vt)
+        if hexc:
+            # type color fills the Visual cell (a colored frame behind the thumbnail; the label text when none)
+            reqs.append({"repeatCell":{"range":{"sheetId":sheet0,"startRowIndex":i,"endRowIndex":i+1,
+                "startColumnIndex":1,"endColumnIndex":2},
+                "cell":{"userEnteredFormat":{"backgroundColor":hex_to_rgb(hexc),
+                    "textFormat":{"foregroundColor":{"red":1,"green":1,"blue":1},"bold":True}}},
+                "fields":"userEnteredFormat(backgroundColor,textFormat)"}})
+        if has_img:
+            # give rows with a thumbnail a 16:9-friendly height
+            reqs.append({"updateDimensionProperties":{"range":{"sheetId":sheet0,"dimension":"ROWS",
+                "startIndex":i,"endIndex":i+1},"properties":{"pixelSize":135},"fields":"pixelSize"}})
     # status data validation
     reqs.append({"setDataValidation":{"range":{"sheetId":sheet0,"startRowIndex":1,"startColumnIndex":5,"endColumnIndex":6},
         "rule":{"condition":{"type":"ONE_OF_LIST","values":[{"userEnteredValue":s} for s in STATUSES]},"showCustomUi":True}}})
@@ -149,7 +162,7 @@ def pull(sb_path):
     doc = json.load(open(sb_path)); sheets, drive = get_services()
     sid = doc.get("sheet_id")
     if not sid: print("No sheet_id yet — run push first."); return
-    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:I").execute().get("values",[])
+    vals = sheets.spreadsheets().values().get(spreadsheetId=sid, range="A:H").execute().get("values",[])
     hdr = vals[0]; ci = {h:i for i,h in enumerate(hdr)}
     by_id = {r["id"]: r for r in doc["rows"]}
     changed = 0

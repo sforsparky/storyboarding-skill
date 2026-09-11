@@ -19,13 +19,16 @@ from `storyboard.json` and reads feedback back into it. Nothing is hosted.
 ## Push
 `scripts/sheets_sync.py push storyboard.json`  (run from the project folder)
 - Creates the Sheet on first run and stores `sheet_id` + `drive_folder_id` back into the JSON.
-- Columns: Line #, Visual, Script, Visual Direction, Notes, Status, Thumbnail, plus a hidden
+- Columns: Line #, Visual, Script, Visual Direction, Notes, Status, Engine, plus a hidden
   Row-ID column so re-pushes update in place (comments stay attached, no renumbering).
 - Writes `▶ SECTION` header rows, applies the legend colors to the Visual column, sets Status
   data-validation (Draft/Generating/Generated/Approved/Reshoot) and Engine data-validation
   (hyperframes/higgsfield/none — the `/storyboard-motion` engine per row, defaulted from the
   visual type but editable in-sheet).
-- Thumbnails use `=IMAGE("<drive url>")` pointing at posters uploaded to the project's Drive
+- The thumbnail lives IN the Visual cell: once a row has a poster, its Visual cell becomes
+  `=IMAGE("<drive url>")` (poster uploaded to the project's Drive), replacing the type label; the
+  row is given a 16:9 height and the type color stays as the cell background. Rows with no asset yet
+  show the type label instead
   folder (the API cannot place in-cell images any other way). Reused talking-head rows point at
   the `reuse_of` row's poster automatically.
 
