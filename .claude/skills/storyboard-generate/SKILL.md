@@ -18,6 +18,8 @@ Selection syntax:
 - `/storyboard-generate 7` — one row.
 - `/storyboard-generate 7 "make the bars taller, lean into the lime accent"` — regenerate row 7
   with added guidance (see "Editing a generated row").
+  Quotes are optional — everything after the row is read as guidance; quote only to disambiguate
+  guidance that starts with a selector keyword (`clip`, `series`, `custom-graphic`, `b-roll`).
 - `/storyboard-generate 5,7,45` — several independent rows.
 - `/storyboard-generate 43-46` — a range, each row generated independently.
 - `/storyboard-generate clip 43-46` — ONE Higgsfield video clip covering the range (see "Clip across rows").
