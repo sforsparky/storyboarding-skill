@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<!-- Brand font reference pattern: in a real project this would be
+     <link href="assets/fonts/fonts.css" rel="stylesheet"> (self-hosted woff2). Omitted here
+     so the template is self-contained — var(--disp) already falls back to
+     system-ui/sans-serif with no fonts.css present. -->
+<link href="base.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+  #ttl{ position:absolute; top:52px; left:0; right:0; text-align:center; z-index:9; }
+  #ttl .disp{ font-size:56px; }
+  #wall{ position:absolute; inset:0; z-index:4; }
+  #links{ position:absolute; inset:0; z-index:2; pointer-events:none; }
+  #links svg{ width:100%; height:100%; overflow:visible; }
+  #links path{ fill:none; stroke:rgba(57,207,170,.62); stroke-width:4;
+    stroke-linecap:round; stroke-linejoin:round; }
+
+  .node{ position:absolute; width:330px; height:118px; margin:-59px 0 0 -165px; border-radius:20px;
+    display:flex; align-items:center; gap:20px; padding:0 26px; opacity:0;
+    background:linear-gradient(150deg,rgba(255,255,255,.24),rgba(255,255,255,.06));
+    border:1px solid rgba(255,255,255,.30);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 20px 44px rgba(6,26,22,.44); }
+  .node .gl{ width:60px; height:60px; flex:0 0 60px; border-radius:15px; display:flex;
+    align-items:center; justify-content:center; font-family:var(--disp); font-weight:800;
+    font-size:28px; color:#06382c; background:linear-gradient(150deg,#5fe0c1,#2AB78E); }
+  .node .nm{ font-family:var(--disp); font-weight:800; font-size:33px; color:#fff; letter-spacing:-.005em; }
+  .node.core{ width:430px; height:146px; margin:-73px 0 0 -215px; }
+  .node.core .gl{ width:70px; height:70px; flex:0 0 70px; font-size:32px; border-radius:18px;
+    background:#fff; color:#0E2A24; }
+  .node.core .nm{ font-size:38px; }
+
+  #foot{ position:absolute; left:0; right:0; bottom:62px; text-align:center; z-index:9; opacity:0; }
+  #foot span{ font-family:var(--disp); font-weight:800; font-size:52px; letter-spacing:.02em; color:#fff; }
+  #foot em{ font-style:normal; color:var(--emerald); }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="orthogonal-links" data-start="0" data-duration="7" data-width="1920" data-height="1080" data-fps="30">
+  <div id="bg"></div><div id="vign"></div>
+
+  <div id="ttl"><div class="disp">One Hub, Every Destination</div></div>
+
+  <div class="stage"><div class="world" id="world">
+    <!-- Orthogonal bus routing: every segment starts and ends ON a node's edge and no
+         segment ever passes under a node (nodes are translucent, so a straight
+         centre-to-centre line would show through). Two cores send a stub to a shared bus;
+         the bus runs outward and turns a rounded corner onto each outer node's edge.
+
+           top row     A (330,268)   B (960,214)   C (1590,268)     node edges y=327 / 273
+           top bus     y=394  ← midpoint of the gap between the top row and the cores
+           cores       Core 1 (718,535)  Core 2 (1202,535)          node edges y=462..608
+           bottom bus  y=674  ← midpoint of the gap between the cores and the bottom row
+           bottom row  D (330,800)   E (960,856)   F (1590,800)     node edges start y=741/797 -->
+    <div id="links"><svg viewBox="0 0 1920 1080" preserveAspectRatio="none" id="lsvg">
+      <!-- stubs: core edge -> bus -->
+      <path class="stub" d="M 718 462 L 718 394"/>   <path class="stub" d="M 1202 462 L 1202 394"/>
+      <path class="stub" d="M 718 608 L 718 674"/>   <path class="stub" d="M 1202 608 L 1202 674"/>
+      <!-- shared bus segment between the two stubs -->
+      <path class="mid" d="M 718 394 L 1202 394"/>   <path class="mid" d="M 718 674 L 1202 674"/>
+      <!-- one path per outer node, drawn as the connection reaches it -->
+      <path id="l1" d="M 718 394 L 352 394 Q 330 394 330 372 L 330 327"/>
+      <path id="l2" d="M 960 394 L 960 273"/>
+      <path id="l3" d="M 1202 394 L 1568 394 Q 1590 394 1590 372 L 1590 327"/>
+      <path id="l4" d="M 718 674 L 352 674 Q 330 674 330 696 L 330 741"/>
+      <path id="l5" d="M 960 674 L 960 797"/>
+      <path id="l6" d="M 1202 674 L 1568 674 Q 1590 674 1590 696 L 1590 741"/>
+    </svg></div>
+
+    <div id="wall">
+      <div class="node core" id="c1" style="left:718px;  top:535px;"><span class="gl">1</span><span class="nm">Core 1</span></div>
+      <div class="node core" id="c2" style="left:1202px; top:535px;"><span class="gl">2</span><span class="nm">Core 2</span></div>
+
+      <div class="node" id="e1" style="left:330px;  top:268px;"><span class="gl">A</span><span class="nm">Node A</span></div>
+      <div class="node" id="e2" style="left:960px;  top:214px;"><span class="gl">B</span><span class="nm">Node B</span></div>
+      <div class="node" id="e3" style="left:1590px; top:268px;"><span class="gl">C</span><span class="nm">Node C</span></div>
+      <div class="node" id="e4" style="left:330px;  top:800px;"><span class="gl">D</span><span class="nm">Node D</span></div>
+      <div class="node" id="e5" style="left:960px;  top:856px;"><span class="gl">E</span><span class="nm">Node E</span></div>
+      <div class="node" id="e6" style="left:1590px; top:800px;"><span class="gl">F</span><span class="nm">Node F</span></div>
+    </div>
+
+    <div id="foot"><span>Connects to <em>Everything</em></span></div>
+  </div></div>
+</div>
+
+<script>
+  const tl = gsap.timeline({ paused:true });
+  gsap.set('#bg', { scale:1.07, xPercent:-1, yPercent:-.6 });
+  tl.to('#bg', { scale:1.12, xPercent:1, yPercent:.6, duration:7, ease:'none' }, 0);
+
+  // Trap #3 (TRAPS.md): every connector starts fully undrawn, cap-safe. dasharray L / gap
+  // L+20, offset L+10 puts the hidden dash entirely PAST the path's end, so no round-cap dot
+  // renders at the endpoint while it waits (dasharray:L / offset:L leaves exactly that dot).
+  // Tweening the offset to 0 still draws the full path from its start outward.
+  function prep(sel) {
+    const els = Array.from(document.querySelectorAll(sel));
+    els.forEach(function (p) {
+      const L = p.getTotalLength();
+      gsap.set(p, { strokeDasharray:L + ' ' + (L + 20), strokeDashoffset:L + 10 });
+    });
+    return els;
+  }
+  const stubs = prep('.stub'), mids = prep('.mid');
+  const tgt = [1, 2, 3, 4, 5, 6].map(function (i) { return prep('#l' + i)[0]; });
+
+  tl.fromTo('#ttl .disp', { autoAlpha:0, y:24 }, { autoAlpha:1, y:0, duration:0.55, ease:'power3.out' }, 0.05);
+  tl.fromTo('#world', { z:-170, autoAlpha:0 }, { z:0, autoAlpha:1, duration:0.8, ease:'power4.out' }, 0.1);
+
+  // the cores land first
+  tl.fromTo('.core', { opacity:0, scale:0.72 },
+    { opacity:1, scale:1, duration:0.55, ease:'back.out(1.8)', stagger:0.16 }, 0.55);
+
+  // the connection leaves the cores: stubs reach the bus, the bus segment joins them
+  tl.to(stubs, { strokeDashoffset:0, duration:0.30, ease:'power2.out' }, 1.30);
+  tl.to(mids, { strokeDashoffset:0, duration:0.35, ease:'power2.inOut' }, 1.55);
+
+  // then it travels outward one node at a time, each connector landing its card
+  tgt.forEach(function (p, i) {
+    tl.to(p, { strokeDashoffset:0, duration:0.45, ease:'power2.out' }, 1.90 + i * 0.28);
+    tl.fromTo('#e' + (i + 1), { opacity:0, scale:0.5 },
+      { opacity:1, scale:1, duration:0.42, ease:'back.out(2.2)', immediateRender:false }, 2.25 + i * 0.28);
+  });
+
+  tl.fromTo('#foot', { opacity:0, y:26 }, { opacity:1, y:0, duration:0.55, ease:'power3.out' }, 4.4);
+  tl.to('#world', { scale:1.025, duration:2.2, ease:'sine.inOut' }, 4.4);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["orthogonal-links"] = tl;
+</script>
+</body>
+</html>

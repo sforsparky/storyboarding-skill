@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<!-- Brand font reference pattern: in a real project this would be
+     <link href="assets/fonts/fonts.css" rel="stylesheet"> (self-hosted woff2). Omitted here
+     so the template is self-contained — var(--disp)/var(--body) already fall back to
+     system-ui/sans-serif with no fonts.css present. -->
+<link href="base.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+  #kick{ position:absolute; top:58px; left:0; right:0; text-align:center; z-index:9; }
+  #kick .k{ font-family:var(--disp); font-weight:800; letter-spacing:.3em; text-transform:uppercase;
+    font-size:24px; color:var(--emerald); }
+  #kick .h{ font-family:var(--disp); font-weight:800; font-size:52px; margin-top:10px; }
+
+  /* the spotlight behind whichever item is lifted — a sibling of .world (not inside its
+     preserve-3d), so it always paints under everything on the shelf and in the air */
+  #spot{ position:absolute; left:490px; top:440px; width:1100px; height:1100px; margin:-550px 0 0 -550px;
+    border-radius:50%; opacity:0; pointer-events:none;
+    background:radial-gradient(circle,rgba(57,207,170,.34) 0%,rgba(57,207,170,.10) 34%,rgba(57,207,170,0) 62%); }
+
+  /* every item is only ever scaled DOWN from its natural box (shelf .25x, spotlight up to 1x)
+     — scaling a small raster up goes soft in the render capture (see TRAPS.md #7) */
+  #rail{ position:absolute; left:50%; top:0; width:0; height:0; transform-style:preserve-3d; }
+  #rail .item{ position:absolute; top:-300px; height:600px; display:block; opacity:0;
+    filter:drop-shadow(0 26px 34px rgba(4,20,16,.55)); }
+  #rail img{ width:100%; height:100%; display:block; object-fit:contain; }
+  /* placeholder "cover" used when no real image is supplied — same box, so the shelf/lift
+     math never has to know which kind it is */
+  .cover-ph{ width:100%; height:100%; border-radius:14px; display:flex; align-items:center;
+    justify-content:center; text-align:center; padding:24px; box-sizing:border-box;
+    font-family:var(--disp); font-weight:800; font-size:28px; color:#fff; line-height:1.2; }
+
+  /* a shelf: a light edge items stand on, and a soft floor shadow under it. */
+  .ledge{ position:absolute; left:40px; right:40px; height:2px; opacity:0;
+    background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.32) 12%,rgba(255,255,255,.32) 88%,rgba(255,255,255,0)); }
+  /* Trap #8 (TRAPS.md): the floor shadow is an ELLIPSE, not a bar — a rectangular shadow
+     crops at the container edge on every shelf, worst on the widest one. */
+  .ledge i{ position:absolute; left:-6%; right:-6%; top:2px; height:44px; display:block;
+    background:radial-gradient(50% 100% at 50% 0%,rgba(4,20,16,.46),rgba(4,20,16,.2) 45%,rgba(4,20,16,0) 100%); }
+  #ledge{ top:1017px; }
+
+  .panel{ position:absolute; right:104px; top:260px; width:820px; z-index:7; opacity:0; }
+  .panel .pk{ font-family:var(--label); font-weight:600; font-size:23px; letter-spacing:.28em;
+    text-transform:uppercase; color:var(--emerald); }
+  .panel .ph{ font-family:var(--disp); font-weight:800; font-size:52px; margin-top:10px; line-height:1.08; }
+  .panel .pd{ margin-top:22px; font-size:24px; color:var(--muted); line-height:1.5; max-width:700px; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="shelf-spotlight" data-start="0" data-duration="9" data-width="1920" data-height="1080" data-fps="30">
+  <div id="bg"></div><div id="vign"></div>
+
+  <div id="kick"><div class="k">Included With The Course</div><div class="h">Five Bonus Guides</div></div>
+
+  <div class="stage">
+    <div id="spot"></div>
+    <div class="world" id="world">
+      <div class="ledge" id="ledge"><i></i></div>
+      <div id="rail"></div>
+      <div class="panel" id="p1">
+        <div class="pk">Bonus Guide</div>
+        <div class="ph" id="p1h">Item One</div>
+        <div class="pd" id="p1d">Swap this copy per item — driven by the same ITEMS array below.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- PARAMETERS: one entry per item on the shelf ----------
+  // `src` is optional — omit it (or leave it out entirely) to get a labeled placeholder
+  // cover instead of a real image, so this template runs with no bundled assets. To use
+  // real art, set `src` to an image path and drop the image under this folder.
+  const ITEMS = [
+    { label:'Quick\nStart',      aspect:0.75, color:'#2AB78E', title:'Quick Start Guide',      desc:'Up and running in minutes — account, funding, first trade.' },
+    { label:'Risk\nManagement',  aspect:0.75, color:'#39CFAB', title:'Risk Management',         desc:'Position sizing and stop placement, worked through with real numbers.' },
+    { label:'Trade\nChecklist',  aspect:0.46, color:'#5fe0c1', title:'Trade Checklist',          desc:'Nine checks to run before every entry — direction, size, exit plan.' },
+    { label:'Order\nTypes',      aspect:0.92, color:'#1c8f79', title:'Order Types Cheat Sheet', desc:'Margin ratio, notional value, funding rate — defined plainly.' },
+    { label:'Glossary',          aspect:0.75, color:'#237a68', title:'Glossary',                 desc:'Every term from the course in one place, indexed and searchable.' },
+  ];
+
+  const N = ITEMS.length, H = 600;               // natural (unscaled) box height, px
+  const rail = document.getElementById('rail');
+  const items = ITEMS.map(function (spec, i) {
+    const w = H * spec.aspect;
+    const el = document.createElement('div');
+    el.className = 'item'; el.id = 'it' + i;
+    el.style.width = w + 'px'; el.style.left = (-w / 2) + 'px';   // box centred on its origin
+    if (spec.src) {
+      el.innerHTML = '<img src="' + spec.src + '" alt="">';
+    } else {
+      el.innerHTML = '<div class="cover-ph" style="background:' + spec.color + '">' +
+        spec.label.split('\n').join('<br>') + '</div>';
+    }
+    rail.appendChild(el);
+    return el;
+  });
+
+  // shelf: all items 150px tall, standing on the ledge at y=1017, fitted inside the frame
+  const SH = 150, GAP = 22, S_SHELF = SH / H, SHELF_Y = 1017 - SH / 2;
+  const sw = ITEMS.map(function (s) { return SH * s.aspect; });
+  const total = sw.reduce(function (a, b) { return a + b; }, 0) + GAP * (N - 1);
+  const slotX = []; let cx = -total / 2;
+  sw.forEach(function (w) { slotX.push(cx + w / 2); cx += w + GAP; });
+  const SHELF = ITEMS.map(function (s, i) {
+    return { x:slotX[i], y:SHELF_Y, z:0, rotationY:0, scale:S_SHELF, opacity:1 };
+  });
+  const SHELF_DIM = SHELF.map(function (s) { return Object.assign({}, s, { opacity:0.72 }); });
+  const HERO = { x:-490, y:445, z:0, rotationY:0, scale:1 };   // spotlight slot, 600px tall
+
+  const tl = gsap.timeline({ paused:true });
+  gsap.set('#bg', { scale:1.06, xPercent:-1, yPercent:-.6 });
+  tl.to('#bg', { scale:1.14, xPercent:1, yPercent:.6, duration:9, ease:'none' }, 0);
+
+  // Trap #6 (TRAPS.md): every leg of every item's journey is an explicit fromTo with known
+  // start values and immediateRender:false, so a cold seek anywhere in the timeline lands on
+  // the same frame linear playback would produce.
+  function leg(i, from, to, at, dur, ease) {
+    tl.fromTo(items[i], from, Object.assign({ duration:dur, ease:ease, immediateRender:false }, to), at);
+  }
+
+  // ---------- 0-1.5s: the shelf assembles ----------
+  tl.fromTo('#kick .k', { autoAlpha:0, y:14 }, { autoAlpha:1, y:0, duration:0.45 }, 0.1);
+  tl.fromTo('#kick .h', { autoAlpha:0, y:24 }, { autoAlpha:1, y:0, duration:0.55, ease:'power3.out' }, 0.25);
+  tl.fromTo('#ledge', { opacity:0 }, { opacity:1, duration:0.5 }, 0.4);
+  for (let i = 0; i < N; i++) {
+    leg(i, { x:SHELF[i].x, y:SHELF[i].y - 60, z:-400, scale:SHELF[i].scale, opacity:0 },
+      SHELF[i], 0.5 + i * 0.1, 0.7, 'power3.out');
+  }
+
+  // ---------- 2.0-6.5s: item 0 lifts into the spotlight ----------
+  const HERO_IDX = 0;
+  for (let i = 0; i < N; i++) if (i !== HERO_IDX) leg(i, SHELF[i], SHELF_DIM[i], 2.0, 0.5, 'power2.out');
+  leg(HERO_IDX, SHELF_DIM[HERO_IDX], HERO, 2.0, 0.75, 'power3.out');
+  tl.to('#spot', { opacity:1, duration:0.6, ease:'power2.out' }, 2.0);
+  tl.fromTo('#p1', { opacity:0, x:60 }, { opacity:1, x:0, duration:0.6, ease:'power3.out' }, 2.5);
+  document.getElementById('p1h').textContent = ITEMS[HERO_IDX].title;
+  document.getElementById('p1d').textContent = ITEMS[HERO_IDX].desc;
+
+  // ---------- 6.5-7.2s: put it back ----------
+  leg(HERO_IDX, HERO, SHELF[HERO_IDX], 6.5, 0.6, 'power2.inOut');
+  for (let i = 0; i < N; i++) if (i !== HERO_IDX) leg(i, SHELF_DIM[i], SHELF[i], 6.5, 0.5, 'power2.out');
+  tl.to('#spot', { opacity:0, duration:0.45, ease:'power2.in' }, 6.55);
+  tl.to('#p1', { opacity:0, x:-40, duration:0.45, ease:'power2.in' }, 6.55);
+
+  tl.to('#world', { z:36, duration:2.4, ease:'sine.inOut' }, 6.9);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["shelf-spotlight"] = tl;
+</script>
+</body>
+</html>

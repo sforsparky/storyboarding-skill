@@ -56,3 +56,17 @@ re-imports). `scripts/lib_types.py` is the shared type vocabulary — import it,
 `scripts/sb_to_xlsx.py <storyboard.json> <out.xlsx>` renders a formatted workbook (section rows,
 Status column, embedded posters, legend) for anyone without Google access. The live Sheet from
 The rendered `.xlsx` (opened in Google Sheets) is the collaboration surface — it embeds thumbnails in the Visual cell.
+
+## Stakeholder review page (no sign-in needed)
+The xlsx is the editor's handoff; stakeholders review on a web page instead:
+1. `scripts/build_review.py <storyboard.json> -o review --title "<Project> Review"` — one card per row
+   (VO script, direction, media that plays only that row's segment of a shared clip, prior notes),
+   two verdicts per row (Approve by default / Needs changes; silence = approved) plus a note, state kept in the viewer's browser,
+   and an "Export my review" button that copies a JSON payload (downloads are inert in the artifact
+   viewer, so it is clipboard + textarea). `[generated]` implementation notes are hidden unless
+   `--internal`. Media is transcoded to 960px previews under `review/media/` (budget `--max-total-mb`).
+2. Publish `review/index.html` as an artifact with `review/media/*` as supporting files (map form:
+   published path → source path, `root: review`). Label each publish with the round.
+3. Reviewers paste their exported payload back; `scripts/ingest_review.py <storyboard.json>
+   payload.json --apply` appends each note as feedback (who = "<name> (review page)") and promotes
+   Generated → Approved on approve verdicts. Idempotent; never lowers a status.

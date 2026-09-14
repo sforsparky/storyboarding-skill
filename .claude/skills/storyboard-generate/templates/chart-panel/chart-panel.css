@@ -1,0 +1,17 @@
+/* TradingView-style panel shared by rows 002 / 006 / 007 — identical chrome every time. */
+#panel{ position:absolute; left:84px; right:84px; top:168px; bottom:96px;
+  background:#fff; border-radius:26px; box-shadow:0 48px 96px rgba(6,26,22,.55);
+  overflow:hidden; display:flex; flex-direction:column; }
+#phead{ height:92px; flex:0 0 92px; display:flex; align-items:center; gap:22px;
+  padding:0 34px; border-bottom:1px solid #e6eae9; background:#fbfcfc; color:#10302a; }
+#phead .tick{ font-family:var(--disp); font-weight:800; font-size:34px; letter-spacing:-.01em; }
+#phead .tf{ font-family:var(--label); font-weight:600; font-size:22px; letter-spacing:.14em;
+  text-transform:uppercase; color:#5d726d; border:1px solid #dfe5e3; border-radius:8px; padding:6px 14px; }
+#phead .last{ margin-left:auto; font-family:var(--disp); font-weight:800; font-size:34px; color:#1c8f79; }
+#phead .dot{ width:12px; height:12px; border-radius:50%; background:#26A69A; }
+/* min-height:0 is load-bearing: a flex item defaults to min-height:auto (= its content), and the
+   chart svg's intrinsic height at this width is ~676px, so a panel shorter than ~792px made
+   #plot overflow and #panel{overflow:hidden} clipped the chart's bottom band (r025 lost its
+   year axis and trough candles). With 0, the plot shrinks and the svg squashes to fit. */
+#plot{ flex:1; min-height:0; position:relative; padding:18px 26px 6px; }
+#plot svg{ width:100%; height:100%; display:block; overflow:visible; }

@@ -71,6 +71,9 @@ through `/general-video` (or `/motion-graphics` for a single ≤10s unit).
 3. `npx hyperframes check` until **0 errors** (fix seek-safety: `fromTo` not CSS+GSAP transform
    conflicts, boundary `tl.set` hard-kills, static `d` before `getTotalLength`, contrast, overlap).
    Snapshot scene midpoints (`npx hyperframes snapshot --at ...`) and eyeball the contact sheet.
+   Then apply the **Craft standards** in `/storyboard-generate` (no overlap, no visible edges on
+   soft things, supplied art on top, every set member visible, derived values, verify by
+   measurement) — they are the review bar for every frame, motion sheet included.
 4. `npx hyperframes render` → MP4 (silent; the editor sets sound). Copy to `assets/NNN_slug_motion.mp4`.
 
 ### 2B · `higgsfield` shots (image-to-video — atmospheric only)

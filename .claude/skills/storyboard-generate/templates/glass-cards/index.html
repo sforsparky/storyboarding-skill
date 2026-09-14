@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<!-- Brand font reference pattern: in a real project this would be
+     <link href="assets/fonts/fonts.css" rel="stylesheet"> (self-hosted woff2). Omitted here
+     so the template is self-contained — var(--disp)/var(--body)/var(--label) already end in
+     system-ui/sans-serif, so text renders correctly with no fonts.css present. -->
+<link href="base.css" rel="stylesheet">
+<!-- Material Symbols: allowed external font host (fonts.googleapis.com / fonts.gstatic.com).
+     If this request fails offline, the <span> glyphs just render as their literal fallback
+     text (e.g. "bolt") — ugly but never blank, so the render is never empty. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+  .material-symbols-outlined{
+    font-family:'Material Symbols Outlined'; font-weight:normal; font-style:normal;
+    font-size:24px; line-height:1; letter-spacing:normal; text-transform:none;
+    display:inline-block; white-space:nowrap; word-wrap:normal; direction:ltr;
+    -webkit-font-feature-settings:'liga'; font-feature-settings:'liga';
+    -webkit-font-smoothing:antialiased;
+  }
+  #cards{ position:absolute; left:0; right:0; top:0; bottom:0; display:flex;
+    align-items:center; justify-content:center; gap:56px; }
+  .card{ width:420px; padding:44px 40px; border-radius:28px; opacity:0; }
+  .card .icon-wrap{ width:76px; height:76px; border-radius:20px; display:flex;
+    align-items:center; justify-content:center; margin-bottom:26px;
+    background:linear-gradient(150deg,#5fe0c1,#2AB78E); }
+  .card .icon-wrap .material-symbols-outlined{ font-size:40px; color:#06382c; }
+  .card h3{ font-family:var(--disp); font-weight:800; font-size:32px; color:#fff;
+    letter-spacing:-.005em; margin-bottom:14px; }
+  .card p{ font-family:var(--body); font-size:21px; line-height:1.5; color:var(--muted); }
+  .card .chip{ margin-top:26px; }
+  #kick{ position:absolute; top:96px; left:0; right:0; text-align:center; opacity:0; }
+  #kick .disp{ font-size:60px; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="glass-cards" data-start="0" data-duration="5" data-width="1920" data-height="1080" data-fps="30">
+  <div id="bg"></div><div id="vign"></div>
+
+  <div id="kick"><div class="disp">Three Reasons It Works</div></div>
+
+  <div id="cards">
+    <!-- .frost, not .glass: safe inside transform-style:preserve-3d (no backdrop-filter,
+         which does not survive the headless capture path — see base.css's own comment
+         distinguishing the two). Use .glass only on a flat, non-3D scene. -->
+    <div class="card frost" id="c1">
+      <div class="icon-wrap"><span class="material-symbols-outlined">bolt</span></div>
+      <h3>Fast Execution</h3>
+      <p>Orders route in milliseconds, so the price you see is the price you get.</p>
+      <span class="chip"><svg class="ico" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>Verified</span>
+    </div>
+    <div class="card frost" id="c2">
+      <div class="icon-wrap"><span class="material-symbols-outlined">shield</span></div>
+      <h3>Risk Controls</h3>
+      <p>Built-in stop-loss and position sizing keep one bad trade from ending the account.</p>
+      <span class="chip"><svg class="ico" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>Included</span>
+    </div>
+    <div class="card frost" id="c3">
+      <div class="icon-wrap"><span class="material-symbols-outlined">insights</span></div>
+      <h3>Live Signals</h3>
+      <p>Confirmed setups, not guesses — the same chart read every time it appears.</p>
+      <span class="chip"><svg class="ico" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>Daily</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tl = gsap.timeline({ paused:true });
+  gsap.set('#bg', { scale:1.05, xPercent:-1, yPercent:-.5 });
+  tl.to('#bg', { scale:1.1, xPercent:1, yPercent:.5, duration:5, ease:'none' }, 0);
+
+  tl.fromTo('#kick', { autoAlpha:0, y:-20 }, { autoAlpha:1, y:0, duration:0.5, ease:'power3.out' }, 0.1);
+
+  // explicit fromTo, immediateRender:false — a cold seek into the middle of the stagger must
+  // land on the same per-card offset a linear play would produce
+  tl.fromTo('.card', { opacity:0, y:40, scale:0.94 },
+    { opacity:1, y:0, scale:1, duration:0.6, ease:'back.out(1.6)', stagger:0.18, immediateRender:false }, 0.6);
+
+  tl.to('#cards', { y:-6, duration:2.4, ease:'sine.inOut' }, 2.4);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["glass-cards"] = tl;
+</script>
+</body>
+</html>

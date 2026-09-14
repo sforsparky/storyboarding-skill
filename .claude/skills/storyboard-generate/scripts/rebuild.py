@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Rebuild one HyperFrames graphic composition and put the result back on the board.
+
+  rebuild.py <storyboard.json> <row-number|name-fragment> [--no-xlsx] [--no-check] [--dry-run] [--range IN OUT]
+
+Replaces the old rebuild-row.sh + poster-times.json combo. Posters are no longer cut from a
+side file: every row on the board whose assets[].file points at the rendered mp4 gets its
+poster re-cut straight from that row's own asset (poster_t, or a segment-derived fallback),
+so a shared clip's per-beat posters and a single-row graphic's poster both come from one
+source of truth — storyboard.json.
+
+Steps: resolve the graphics dir (recorded on the board), resolve the composition file the
+same way rebuild-row.sh did, lint the project, render at high quality, copy the result into
+the project's assets/, cut every referencing row's poster, and refresh the xlsx.
+
+Python 3 stdlib only.
+"""
+import argparse
+import glob
+import os
+import shutil
+import subprocess
+import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+from generate_row import load, save, BEAT_POSTER_AT  # noqa: E402  (reuse skill conventions)
+
+HF_VERSION = "0.8.34"
+HF_PKG = f"hyperframes@{HF_VERSION}"
+DEFAULT_GRAPHICS_DIR = "videos/vsl-graphics"
+SB_TO_XLSX = os.path.expanduser(
+    "~/.claude/skills/storyboard-build/scripts/sb_to_xlsx.py")
+CHECK_ROW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_row.py")
+
+# Candidate flag names a future hyperframes render might expose for a partial/windowed
+# render. None of these exist in 0.8.34 (checked via `render --help`) — kept as a probe so
+# this script notices automatically if a later version adds one, instead of silently
+# pretending to support --range.
+RANGE_FLAG_CANDIDATES = ("--start", "--end", "--range", "--frame-window",
+                          "--in-point", "--out-point", "--trim-start", "--trim-end")
+
+
+def die(msg, code=1):
+    print(f"error: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def run(cmd, cwd):
+    try:
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        die(f"could not run {cmd[0]!r}: {e}")
+
+
+def ensure_graphics_dir(sb_path, doc, dry_run):
+    """storyboard.json['graphics_dir'], relative to the project. Added (and persisted) if
+    missing, unless this is a dry run."""
+    if "graphics_dir" in doc:
+        return doc["graphics_dir"], False
+    if dry_run:
+        return DEFAULT_GRAPHICS_DIR, True
+    doc["graphics_dir"] = DEFAULT_GRAPHICS_DIR
+    save(sb_path, doc)
+    return DEFAULT_GRAPHICS_DIR, True
+
+
+def resolve_composition(graphics_dir_abs, query):
+    """Same rule as rebuild-row.sh: zero-pad a pure number to 3 digits, then a case-
+    insensitive substring match against compositions/*.html. Errors list the candidates."""
+    q = f"{int(query):03d}" if query.isdigit() else query
+    comp_dir = os.path.join(graphics_dir_abs, "compositions")
+    candidates = sorted(glob.glob(os.path.join(comp_dir, "*.html")))
+    matches = [c for c in candidates if q.lower() in os.path.basename(c).lower()]
+    if not matches:
+        listing = "\n".join("  " + os.path.basename(c) for c in candidates)
+        die(f"no composition matches {query!r}\navailable:\n{listing}")
+    if len(matches) > 1:
+        listing = "\n".join("  " + os.path.basename(c) for c in matches)
+        die(f"{query!r} is ambiguous:\n{listing}")
+    return matches[0]
+
+
+def poster_time_for(asset):
+    """poster_t if the board recorded one; else segment-derived (in + (out-in)*0.78); else a
+    flat 3.0s. Mirrors generate_row.py's BEAT_POSTER_AT convention."""
+    if asset.get("poster_t") is not None:
+        return float(asset["poster_t"]), "poster_t"
+    seg = asset.get("segment")
+    if seg:
+        lo, hi = float(seg[0]), float(seg[1])
+        return lo + (hi - lo) * BEAT_POSTER_AT, f"segment {lo:g}-{hi:g} * {BEAT_POSTER_AT}"
+    return 3.0, "default 3.0s (no poster_t, no segment)"
+
+
+def find_xlsx(project_dir, doc):
+    existing = [f for f in os.listdir(project_dir)
+                if f.lower().endswith(".xlsx") and not f.startswith("~$")]
+    sb_named = [f for f in existing if "storyboard" in f.lower()]
+    if len(sb_named) == 1:
+        return sb_named[0]
+    if len(existing) == 1:
+        return existing[0]
+    proj = str(doc.get("project", "storyboard")).replace("-", " ").replace("_", " ").title()
+    return f"{proj} - Storyboard.xlsx"
+
+
+def detect_range_flags(graphics_dir_abs):
+    proc = run(["npx", "--yes", HF_PKG, "render", "--help"], cwd=graphics_dir_abs)
+    text = (proc.stdout or "") + (proc.stderr or "")
+    return [f for f in RANGE_FLAG_CANDIDATES if f in text]
+
+
+def do_range(graphics_dir_abs, name, in_t, out_t, dry_run):
+    flags = detect_range_flags(graphics_dir_abs)
+    if not flags:
+        print(f"range rendering not supported by hyperframes {HF_VERSION}")
+        sys.exit(2)
+
+    out_rel = f"renders/{name}_{in_t}-{out_t}.mp4"
+    print(f"  range render appears supported via {', '.join(flags)}")
+    if dry_run:
+        print(f"[dry-run] would render window {in_t}-{out_t} -> {out_rel}")
+        return
+
+    cmd = ["npx", "--yes", HF_PKG, "render", "--composition", f"compositions/{name}.html",
+           "--quality", "high", "-o", out_rel, "--quiet"]
+    if "--start" in flags and "--end" in flags:
+        cmd += ["--start", in_t, "--end", out_t]
+    elif "--range" in flags:
+        cmd += ["--range", f"{in_t}-{out_t}"]
+    elif "--frame-window" in flags:
+        cmd += ["--frame-window", f"{in_t}-{out_t}"]
+    proc = run(cmd, cwd=graphics_dir_abs)
+    if proc.returncode != 0:
+        print(proc.stdout)
+        print(proc.stderr)
+        die("range render failed")
+    print(out_rel)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Rebuild one HyperFrames graphic and put it back on the storyboard.")
+    ap.add_argument("storyboard")
+    ap.add_argument("selector", help="row number or a substring of the composition name")
+    ap.add_argument("--no-xlsx", action="store_true", help="skip rebuilding the xlsx")
+    ap.add_argument("--dry-run", action="store_true", help="print the plan, do nothing")
+    ap.add_argument("--no-check", action="store_true",
+                    help="skip the craft check (check_row.py) that runs at every poster time after the render")
+    ap.add_argument("--range", nargs=2, metavar=("IN", "OUT"),
+                     help="render only this time window for fast iteration")
+    args = ap.parse_args()
+
+    sb_path = os.path.abspath(args.storyboard)
+    if not os.path.isfile(sb_path):
+        die(f"storyboard not found: {sb_path}")
+    project_dir = os.path.dirname(sb_path)
+    doc = load(sb_path)
+
+    graphics_dir_rel, added = ensure_graphics_dir(sb_path, doc, args.dry_run)
+    graphics_dir_abs = os.path.join(project_dir, graphics_dir_rel)
+    if added:
+        verb = "would add" if args.dry_run else "added"
+        print(f"storyboard.json: {verb} graphics_dir = {graphics_dir_rel!r}")
+
+    comp_path = resolve_composition(graphics_dir_abs, args.selector)
+    name = os.path.splitext(os.path.basename(comp_path))[0]
+    print(f"-> {name}")
+
+    if args.range:
+        do_range(graphics_dir_abs, name, args.range[0], args.range[1], args.dry_run)
+        return
+
+    asset_file_rel = f"assets/{name}.mp4"
+    referencing = [(row, asset) for row in doc["rows"] for asset in row.get("assets", [])
+                   if asset.get("file") == asset_file_rel]
+    poster_plan = []
+    for row, asset in referencing:
+        if "poster" not in asset:
+            continue
+        t, how = poster_time_for(asset)
+        poster_plan.append((row["n"], asset["poster"], t, how))
+
+    if args.dry_run:
+        print("[dry-run] would lint the project")
+        print(f"[dry-run] would render compositions/{name}.html -> "
+              f"{graphics_dir_rel}/renders/{name}.mp4 (quality high)")
+        print(f"[dry-run] would copy renders/{name}.mp4 -> {asset_file_rel}")
+        if poster_plan:
+            for n, poster, t, how in poster_plan:
+                print(f"[dry-run] would cut poster {poster} @ {t:.3f}s (row {n}, {how})")
+        else:
+            print(f"[dry-run] no row references {asset_file_rel} — no posters would be cut")
+        if not args.no_xlsx:
+            print(f"[dry-run] would rebuild {find_xlsx(project_dir, doc)}")
+        return
+
+    # ---- lint (whole project, same as rebuild-row.sh) ----
+    lint = run(["npx", "--yes", HF_PKG, "lint"], cwd=graphics_dir_abs)
+    if lint.returncode != 0:
+        print("lint failed — full output:")
+        print(lint.stdout)
+        print(lint.stderr)
+        die("lint failed", code=1)
+    print("  lint ok")
+
+    # ---- render ----
+    render_rel = f"renders/{name}.mp4"
+    proc = run(["npx", "--yes", HF_PKG, "render", "--composition", f"compositions/{name}.html",
+                "--quality", "high", "-o", render_rel, "--quiet"], cwd=graphics_dir_abs)
+    if proc.returncode != 0:
+        print(proc.stdout)
+        print(proc.stderr)
+        die("render failed")
+    print(f"  rendered {render_rel}")
+
+    # ---- copy into the project's assets/ ----
+    src = os.path.join(graphics_dir_abs, render_rel)
+    dst = os.path.join(project_dir, asset_file_rel)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy2(src, dst)
+    print(f"  copied -> {asset_file_rel}")
+
+    # ---- posters, cut straight from the board ----
+    if not poster_plan:
+        print(f"  no row references {asset_file_rel} — render left in place, no posters cut")
+    for n, poster, t, how in poster_plan:
+        poster_abs = os.path.join(project_dir, poster)
+        os.makedirs(os.path.dirname(poster_abs), exist_ok=True)
+        ff = subprocess.run(["ffmpeg", "-y", "-ss", f"{t:.3f}", "-i", dst, "-frames:v", "1",
+                              poster_abs], capture_output=True, text=True)
+        if ff.returncode != 0:
+            last = ff.stderr.strip().splitlines()[-1] if ff.stderr.strip() else "unknown error"
+            print(f"  ! row {n}: poster cut failed ({poster}) — {last}")
+            continue
+        print(f"  poster {poster} @ {t:.2f}s (row {n}, {how})")
+
+    # ---- craft check at every poster time (the frames stakeholders will actually see) ----
+    check_failed = False
+    if poster_plan and not args.no_check:
+        times = ",".join(f"{t:.3f}" for _, _, t, _ in poster_plan)
+        chk = run(["python3", CHECK_ROW, sb_path, name, "--at", times, "--strict"], cwd=project_dir)
+        tail = [l for l in chk.stdout.splitlines() if l.strip()][-14:]
+        print("  check:")
+        for l in tail:
+            print("    " + l)
+        if chk.returncode != 0:
+            check_failed = True
+            print("  ! CHECK FAILED at a poster time — render and posters are kept so you can look;"
+                  " fix the composition and rebuild (or --no-check to accept)")
+
+    # ---- xlsx ----
+    if not args.no_xlsx:
+        xlsx_name = find_xlsx(project_dir, doc)
+        proc = run(["python3", SB_TO_XLSX, "storyboard.json", xlsx_name], cwd=project_dir)
+        if proc.returncode != 0:
+            print(proc.stdout)
+            print(proc.stderr)
+            die("xlsx rebuild failed")
+        print(f"  board rebuilt ({xlsx_name})")
+
+    print(f"done. {asset_file_rel}")
+    if check_failed:
+        sys.exit(3)
+
+
+if __name__ == "__main__":
+    main()

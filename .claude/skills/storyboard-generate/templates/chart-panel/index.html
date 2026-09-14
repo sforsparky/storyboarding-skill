@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<!-- Brand font reference pattern: in a real project this would be
+     <link href="assets/fonts/fonts.css" rel="stylesheet"> (self-hosted woff2, see
+     hyperframes-creative for vendoring). Deliberately omitted here so the template
+     stays self-contained — every font-family below already falls back to
+     system-ui/sans-serif, so the panel renders correctly with no fonts.css present. -->
+<link href="base.css" rel="stylesheet">
+<link href="chart-panel.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script src="btc-chart.js"></script>
+<style>
+  /* This template is the standalone panel: no brand background image (none is bundled),
+     just the base.css teal field so the chart's white panel has something to sit on. */
+  #panel{ top:168px; bottom:168px; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="chart-panel" data-start="0" data-duration="6" data-width="1920" data-height="1080" data-fps="30">
+  <div id="bg"></div><div id="vign"></div>
+
+  <div class="stage"><div class="world" id="world">
+    <div id="panel">
+      <div id="phead">
+        <span class="dot"></span><span class="tick">BTC / USD</span><span class="tf">1W · Weekly</span>
+        <span class="last" id="last">—</span>
+      </div>
+      <div id="plot"><svg id="chart" preserveAspectRatio="none" /></div>
+    </div>
+  </div></div>
+</div>
+
+<script>
+  // FM_CHART.build is the single source of truth for candle geometry — reuse the same
+  // call (same seed) anywhere this chart needs to reappear pixel-identical.
+  const C = FM_CHART.build(document.getElementById('chart'), { w:1560, h:620 });
+  const n = C.data.length;
+
+  // header price is the chart's own last close — never a hand-typed figure that can drift
+  document.getElementById('last').textContent =
+    '$' + Math.round(C.data[n - 1].c).toLocaleString('en-US');
+
+  const tl = gsap.timeline({ paused:true });
+
+  gsap.set('#bg', { scale:1.07, xPercent:-1, yPercent:-.6 });
+  tl.to('#bg', { scale:1.12, xPercent:1, yPercent:.6, duration:6, ease:'none' }, 0);
+
+  tl.fromTo('#world', { z:-170, autoAlpha:0 }, { z:0, autoAlpha:1, duration:0.85, ease:'power4.out' }, 0);
+  tl.fromTo('#phead .dot, #phead .tick, #phead .tf', { autoAlpha:0, y:12 },
+    { autoAlpha:1, y:0, duration:0.45, ease:'power2.out', stagger:0.08 }, 0.4);
+
+  // Trap #9 (see hyperframes-core/TRAPS.md): candles build left to right, opacity only
+  // (wicks are <line> elements with a degenerate bounding box, so a fill-box scale on them
+  // is unreliable — the stagger alone already reads as the chart drawing itself in).
+  const candles = [];
+  for (let i = 0; i < n; i++) candles.push(C.wicks[i], C.bars[i]);
+  // `each` is DERIVED from the real array length, never hand-tuned for n: candles holds a
+  // wick AND a body per bar, so it is 2n elements. A per-element figure picked for n would
+  // run the build 2x longer than intended and later beats would fire mid-draw.
+  const BUILD = 1.6, BUILD_AT = 0.65;
+  tl.fromTo(candles, { autoAlpha:0 },
+    { autoAlpha:1, duration:0.30, ease:'power1.out',
+      stagger:{ each:BUILD / candles.length, from:'start' } }, BUILD_AT);
+
+  // the close only lands once the chart has finished drawing to it
+  tl.fromTo('#last', { autoAlpha:0, y:10 }, { autoAlpha:1, y:0, duration:0.5, ease:'power2.out' }, BUILD_AT + BUILD + 0.3);
+
+  // then it just breathes for the rest of the beat — a slow drift, nothing asking for attention
+  tl.to('#world', { scale:1.015, duration:2.0, ease:'sine.inOut' }, 4.0);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["chart-panel"] = tl;
+</script>
+</body>
+</html>

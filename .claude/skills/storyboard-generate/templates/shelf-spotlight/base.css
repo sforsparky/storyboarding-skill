@@ -1,0 +1,68 @@
+/* Futures Mastery — shared graphic base. Mirrors videos/motion-sheet house style. */
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:1920px; height:1080px; overflow:hidden; background:#123f35; }
+:root{
+  --teal:#2F7666; --teal-deep:#123f35; --emerald:#39CFAB; --emerald-2:#2AB78E;
+  --white:#fff; --muted:rgba(255,255,255,.74); --muted-2:rgba(255,255,255,.55);
+  --up:#26A69A; --down:#EF5350; --ink:#2B4547; --ink-deep:#08483B;
+  --disp:"Poppins",system-ui,-apple-system,sans-serif;
+  --body:"Poppins",system-ui,-apple-system,sans-serif;
+  --label:"Barlow Semi Condensed","Poppins",system-ui,sans-serif;
+}
+body{ font-family:var(--body); color:var(--white); }
+.disp{ font-family:var(--disp); font-weight:800; letter-spacing:-.01em; line-height:1.02; }
+.kicker{ font-family:var(--body); font-weight:800; letter-spacing:.28em; text-transform:uppercase; font-size:22px; color:var(--emerald); }
+
+#bg{ position:absolute; inset:0; background-image:url('assets/bg.png');
+  background-size:cover; background-position:center; transform-origin:50% 50%; will-change:transform; }
+#vign{ position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(120% 120% at 50% 44%,rgba(0,0,0,0) 46%,rgba(6,26,22,.5) 100%); }
+
+.scene{ position:absolute; inset:0; width:1920px; height:1080px; background:transparent; }
+.stage{ position:absolute; inset:0; perspective:1150px; }
+.world{ position:absolute; inset:0; transform-style:preserve-3d; transform-origin:50% 50%; will-change:transform; }
+.center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+.corner{ position:absolute; top:52px; left:64px; display:flex; align-items:center; gap:14px; z-index:5; }
+.corner .mk{ width:46px; height:auto; display:block; }
+.corner .wm{ font-family:var(--disp); font-weight:800; font-size:30px; line-height:1; }
+.corner .wm small{ display:block; font-size:12px; letter-spacing:.32em; color:#f5f8f7; font-weight:700; }
+
+/* glass — flat scenes only (backdrop-filter) */
+.glass{ background:linear-gradient(150deg,rgba(255,255,255,.22),rgba(255,255,255,.06) 55%,rgba(255,255,255,.03));
+  backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%);
+  border:1px solid rgba(255,255,255,.28);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 26px 54px rgba(6,26,22,.34); }
+/* frost — safe inside preserve-3d (no backdrop-filter) */
+.frost{ background:linear-gradient(155deg,rgba(255,255,255,.26),rgba(255,255,255,.07) 60%,rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.30);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55), 0 30px 60px rgba(6,26,22,.4); }
+.chip{ display:inline-flex; align-items:center; gap:12px; border-radius:999px; padding:16px 26px;
+  font-weight:600; font-size:24px; color:#eafff8;
+  background:linear-gradient(150deg,rgba(255,255,255,.24),rgba(255,255,255,.06));
+  border:1px solid rgba(255,255,255,.30); box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 10px 24px rgba(6,26,22,.28); }
+.chip svg{ width:24px; height:24px; }
+svg.ico{ fill:none; stroke:var(--emerald); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+
+.title-top{ position:absolute; top:84px; left:0; right:0; text-align:center; z-index:4; }
+.title-top .disp{ font-size:76px; }
+.foot{ position:absolute; bottom:46px; left:0; right:0; text-align:center; font-size:19px; color:rgba(255,255,255,.6); }
+.num{ font-variant-numeric:tabular-nums; }
+
+/* animated low-poly mesh, mounted inside #bg so it inherits the background's own drift.
+   No blend mode — it paints low-alpha washes directly (mix-blend-mode does not survive the
+   headless capture path). At rest it is all but invisible; what you see is light moving
+   across the brand field rather than a pattern sitting on top of it. */
+#meshfx{ position:absolute; inset:0; width:100%; height:100%; display:block;
+  pointer-events:none; }
+
+/* ---- Call to action ----------------------------------------------------------
+   One button style for the whole VSL: orange capsule, white text, "Get Started Now".
+   Orange is reserved for CTAs only — emerald stays the brand accent everywhere else,
+   so the button is the single warmest thing on screen and never competes for the eye. */
+.cta-btn{ display:inline-flex; align-items:center; justify-content:center; gap:20px;
+  background:#cf7146; color:#fff; font-family:var(--disp); font-weight:800; font-size:44px;
+  padding:30px 68px; border-radius:999px; white-space:nowrap; letter-spacing:-.005em;
+  box-shadow:0 24px 60px rgba(10,6,4,.38), 0 0 0 7px rgba(207,113,70,.20); }
+.cta-btn svg{ width:40px; height:40px; stroke:#fff; fill:none; stroke-width:3;
+  stroke-linecap:round; stroke-linejoin:round; }

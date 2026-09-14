@@ -32,6 +32,10 @@ tile or one-pager, existing custom graphics, a palette swatch. More is better; 3
    paper, up, down, muted — mapped from the extracted roles), `type`, `logos`, `products`,
    `presenters`, `tone`, `motifs`, `broll_style`, `graphic_style`. Record the source hexes so a
    later /storyboard-brand run can refine rather than restart.
+   Also record `typography.headline_case` (rule + what it applies to — default Title Case
+   (Chicago) for display headlines, tracked-out caps for kickers/labels) and a `supplied_art`
+   list pointing at the masters in `refs/` (product box, covers, badges, presenter still) so
+   /storyboard-generate uses the real files instead of look-alikes.
 4. **Write `brand.md`** — the same system in prose plus the swatch, so a human can eyeball it.
 5. **Confirm with the user**, showing the swatch and the 2–3 judgment calls you made (which colors
    you treated as brand vs scenery, the font guess). They correct in one message; you don't ask
