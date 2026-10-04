@@ -116,13 +116,44 @@ def feedback_cmd(sb_path, selector=None):
         print(f"[{wl}] row {n}{idpart}{rowspart}: {e.get('text', '')}")
 
 
+def resolve_feedback(sb_path, selector="all", entry_id=None):
+    """Mark feedback resolved: every entry on the selected rows ('all' for the whole board), or
+    only the entry with `entry_id`. Stamps `resolved_at`; nothing is deleted, so the note stays
+    readable on the board (shown ✔) and in `feedback`.
+
+    This is the ONLY way a note closes for good. Resolving a comment in Google Sheets does not
+    reach storyboard.json, and a regenerate newer than a note is only a guess — an undated note,
+    or a record-keeping note written just after the render it describes, never clears that way."""
+    doc = load(sb_path)
+    ns = [r["n"] for r in doc["rows"]] if str(selector).lower() == "all" else parse_selector(selector, doc)
+    stamp, count = now_iso(), 0
+    for n in ns:
+        for e in row_by_n(doc, n).get("feedback") or []:
+            if e.get("resolved_at") or (entry_id and e.get("id") != entry_id):
+                continue
+            e["resolved_at"] = stamp
+            count += 1
+    save(sb_path, doc)
+    print(f"resolved {count} feedback entr{'y' if count == 1 else 'ies'}"
+          + (f" (id={entry_id})" if entry_id else "") + f" on row(s) {_fmt_row_range(ns) if ns else '-'}")
+    return count
+
+
+def _keep_layers(row, file_rel, asset):
+    """A re-register of the SAME file keeps the layer deliverables rebuild.py recorded
+    (graphic on alpha + bg); otherwise the board loses its pointer to the editor's files."""
+    for old in row.get("assets") or []:
+        if old.get("file") == file_rel and old.get("layers"):
+            asset["layers"] = old["layers"]
+    return asset
+
 def register(sb_path, n, file_rel, poster_rel, kind, source, duration=None,
              status="Generated", series_id=None):
     doc = load(sb_path); row = row_by_n(doc, n)
     asset = {"file": file_rel, "poster": poster_rel, "kind": kind,
              "source": source, "duration": duration, "registered_at": now_iso()}
     if series_id: asset["series_id"] = series_id
-    row["assets"] = [asset]; row["status"] = status
+    row["assets"] = [_keep_layers(row, file_rel, asset)]; row["status"] = status
     save(sb_path, doc)
     print(f"row {n}: {file_rel} ({status})" + (f" series={series_id}" if series_id else ""))
 
@@ -203,7 +234,7 @@ def register_clip(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, 
                  "registered_at": registered_at}
         if t is not None:
             asset["poster_t"] = t          # recorded so the frame can be re-cut identically
-        r["assets"] = [asset]
+        r["assets"] = [_keep_layers(r, file_rel, asset)]
         r["status"] = "Generated"
     save(sb_path, doc)
     print(f"clip {clip_group}: {file_rel} across rows {a}-{b}")
@@ -265,6 +296,8 @@ def _row_open_feedback(root, row):
     asset_date = age.date() if age else None
     opens, undated = [], 0
     for e in row.get("feedback") or []:
+        if e.get("resolved_at"):              # explicitly closed — never open, never undated
+            continue
         when = e.get("when")
         if not when:
             undated += 1
@@ -359,7 +392,7 @@ def plan(sb_path):
     _print_open_feedback(doc, root)
     return {"local": local, "paid": paid, "done": done, "est_credits": est}
 
-USAGE = "commands: plan | add_feedback | feedback | download | silence | poster | register | register_clip"
+USAGE = "commands: plan | add_feedback | feedback | resolve | download | silence | poster | register | register_clip"
 
 if __name__ == "__main__":
     try:
@@ -402,6 +435,13 @@ if __name__ == "__main__":
         elif cmd == "add_feedback":
             # add_feedback <sb> <selector> "<text>"  — selector: n | a,b,c | A-B
             add_feedback(sys.argv[2], sys.argv[3], sys.argv[4])
+        elif cmd == "resolve":
+            # resolve <sb> [selector|all] [--id ID]
+            rest = sys.argv[3:]
+            eid = None
+            if "--id" in rest:
+                i = rest.index("--id"); eid = rest[i + 1]; rest = rest[:i] + rest[i + 2:]
+            resolve_feedback(sys.argv[2], rest[0] if rest else "all", eid)
         elif cmd == "feedback":
             # feedback <sb> [selector]
             feedback_cmd(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)

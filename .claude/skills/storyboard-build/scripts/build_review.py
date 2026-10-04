@@ -42,6 +42,7 @@ VISUAL_TYPE_COLORS = {
     # screen captures = muted teal-grey, B-roll = deep ink-green, overlays = up-green
     "TALKING HEAD": "#2B4547",
     "TALKING HEAD + LOWER THIRD": "#08483B",
+    "TALKING HEAD + OVERLAY": "#08483B",
     "CUSTOM GRAPHIC": "#2F7666",
     "GRAPHIC / SCREENCAST": "#2F7666",
     "SCREENCAST": "#6F8F88",

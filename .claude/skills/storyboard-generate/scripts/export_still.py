@@ -21,7 +21,7 @@ Usage:
                   frame — scaled internally by --scale to match the actual capture).
   --scale S       deviceScaleFactor for the headless capture (default 1; use 2 for crisp
                   downscales).
-  --transparent   hide #bg/#vign/#meshfx, set html/body background transparent, and capture
+  --transparent   hide the background layer ([data-sb-layer="bg"], plus legacy #bg/#vign/#meshfx), set html/body background transparent, and capture
                   with omitBackground so the PNG carries real alpha. Reports how many pixels
                   in the (cropped) output actually came out with alpha < 255.
   --set SNIPPET   "css:...' or 'js:...' (leading prefix selects which; CSS is the default

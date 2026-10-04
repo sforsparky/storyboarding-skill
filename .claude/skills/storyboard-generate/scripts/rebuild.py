@@ -16,6 +16,7 @@ the project's assets/, cut every referencing row's poster, and refresh the xlsx.
 Python 3 stdlib only.
 """
 import argparse
+import datetime as dt
 import glob
 import os
 import shutil
@@ -25,12 +26,15 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from generate_row import load, save, BEAT_POSTER_AT  # noqa: E402  (reuse skill conventions)
+import layers  # noqa: E402
 
 HF_VERSION = "0.8.34"
 HF_PKG = f"hyperframes@{HF_VERSION}"
 DEFAULT_GRAPHICS_DIR = "videos/vsl-graphics"
 SB_TO_XLSX = os.path.expanduser(
     "~/.claude/skills/storyboard-build/scripts/sb_to_xlsx.py")
+INGEST_SHEET_COMMENTS = os.path.expanduser(
+    "~/.claude/skills/storyboard-build/scripts/ingest_sheet_comments.py")
 CHECK_ROW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_row.py")
 
 # Candidate flag names a future hyperframes render might expose for a partial/windowed
@@ -105,6 +109,47 @@ def find_xlsx(project_dir, doc):
     return f"{proj} - Storyboard.xlsx"
 
 
+def archive_if_commented(project_dir, xlsx_name):
+    """A workbook downloaded back from Google Sheets/Excel carries the reviewers' comment
+    threads inside it, and sb_to_xlsx.py is about to overwrite it in place. Copy it aside
+    first so a rebuild can never silently destroy feedback nobody has read yet."""
+    import zipfile
+    path = os.path.join(project_dir, xlsx_name)
+    if not os.path.exists(path):
+        return None
+    import re
+    try:
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+            if any(n.startswith("xl/threadedComments/") for n in names):
+                has_comments = True                # Excel threads are always a person's
+            else:
+                # Legacy comment parts: only a REVIEWER's count. Notes authored "storyboard" were
+                # written by an older sb_to_xlsx.py itself; archiving on those saved a full copy
+                # of the board on every rebuild with nothing in it anyone wrote.
+                has_comments = False
+                for n in names:
+                    if re.match(r"xl/comments(/comment)?\d*\.xml$", n):
+                        x = zf.read(n).decode("utf8", "ignore")
+                        authors = re.findall(r"<author>(.*?)</author>", x)
+                        ids = re.findall(r'<comment [^>]*authorId="(\d+)"', x)
+                        if any((authors[int(i)] if int(i) < len(authors) else "") != "storyboard" for i in ids):
+                            has_comments = True
+                            break
+    except zipfile.BadZipFile:
+        return None
+    if not has_comments:
+        return None
+    dest_dir = os.path.join(project_dir, "feedback")
+    os.makedirs(dest_dir, exist_ok=True)
+    stamp = dt.date.fromtimestamp(os.path.getmtime(path)).isoformat()
+    base = os.path.basename(xlsx_name)
+    dest = os.path.join(dest_dir, base if base.startswith(stamp) else f"{stamp}_{base}")
+    if not os.path.exists(dest):
+        shutil.copy2(path, dest)
+    return os.path.relpath(dest, project_dir)
+
+
 def detect_range_flags(graphics_dir_abs):
     proc = run(["npx", "--yes", HF_PKG, "render", "--help"], cwd=graphics_dir_abs)
     text = (proc.stdout or "") + (proc.stderr or "")
@@ -144,7 +189,16 @@ def main():
         description="Rebuild one HyperFrames graphic and put it back on the storyboard.")
     ap.add_argument("storyboard")
     ap.add_argument("selector", help="row number or a substring of the composition name")
+    ap.add_argument("--crf", help="override the encoder CRF (lower = cleaner). Fine detail held "
+                                  "under a slow camera move shimmers at the default quantiser; 16 "
+                                  "settles it. Recorded on the row so re-renders keep the setting.")
     ap.add_argument("--no-xlsx", action="store_true", help="skip rebuilding the xlsx")
+    ap.add_argument("--fast-capture", action="store_true",
+                    help="allow HyperFrames' experimental fast capture (faster, but can flicker "
+                         "per render worker — run scripts/check_flicker.py on the result)")
+    ap.add_argument("--no-layers", action="store_true",
+                    help="render flat even if the composition declares a background layer "
+                         "(one pass instead of two — for quick iteration while authoring)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, do nothing")
     ap.add_argument("--no-check", action="store_true",
                     help="skip the craft check (check_row.py) that runs at every poster time after the render")
@@ -182,8 +236,15 @@ def main():
         t, how = poster_time_for(asset)
         poster_plan.append((row["n"], asset["poster"], t, how))
 
+    # A composition that marks its background (data-sb-layer="bg") is delivered as layers: the
+    # graphic on alpha, the background on its own, and a composited preview — see layers.py.
+    layered = layers.declares_bg_layer(comp_path) and not args.no_layers
+
     if args.dry_run:
         print("[dry-run] would lint the project")
+        if layered:
+            print(f"[dry-run] layered delivery: would also write assets/{name}.graphic.mov (alpha) "
+                  f"and assets/{name}.bg.mp4; assets/{name}.mp4 becomes their composite")
         print(f"[dry-run] would render compositions/{name}.html -> "
               f"{graphics_dir_rel}/renders/{name}.mp4 (quality high)")
         print(f"[dry-run] would copy renders/{name}.mp4 -> {asset_file_rel}")
@@ -205,15 +266,56 @@ def main():
         die("lint failed", code=1)
     print("  lint ok")
 
+    # ---- sound effects (opt-in per composition) ----
+    # A row has sound only if it has a cue sheet at sfx/<name>.json. The track is rebuilt from the
+    # composition's live timeline before every render, so a retimed animation carries its sounds
+    # with it; rows without a cue sheet render silent exactly as before.
+    if os.path.exists(os.path.join(graphics_dir_abs, "sfx", name + ".json")):
+        sp = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sfx_track.py"),
+                  graphics_dir_abs, name, "--write-audio-tag"], cwd=graphics_dir_abs)
+        if sp.returncode != 0:
+            print(sp.stdout); print(sp.stderr)
+            die("sfx track failed", code=1)
+        print("  sfx track rebuilt from the timeline")
+
     # ---- render ----
     render_rel = f"renders/{name}.mp4"
-    proc = run(["npx", "--yes", HF_PKG, "render", "--composition", f"compositions/{name}.html",
-                "--quality", "high", "-o", render_rel, "--quiet"], cwd=graphics_dir_abs)
-    if proc.returncode != 0:
-        print(proc.stdout)
-        print(proc.stderr)
-        die("render failed")
-    print(f"  rendered {render_rel}")
+    render_cmd = ["npx", "--yes", HF_PKG, "render", "--composition", f"compositions/{name}.html",
+                  "--quality", "high", "-o", render_rel, "--quiet"]
+    # Screenshot capture, not HyperFrames' experimental fast capture (drawElementImage), unless
+    # asked. Fast capture splits frames across workers and can draw a transformed layer a
+    # sub-pixel differently on one of them — measured 1.75px on every 3rd frame of a camera-rail
+    # clip, which reads as a steady flicker during holds. Screenshot capture of the same
+    # composition: zero flicker frames. Correct frames beat a faster render.
+    if not args.fast_capture:
+        render_cmd += ["--experimental-fast-capture=false"]
+    # a row can pin its own CRF (stored on its asset) so later rebuilds do not lose it
+    crf = args.crf or next((asset.get("crf") for _row, asset in referencing if asset.get("crf")), None)
+    if crf:
+        render_cmd += ["--crf", str(crf)]
+        print(f"  encoding at crf {crf}")
+    if args.crf:
+        for _row, asset in referencing:
+            asset["crf"] = str(args.crf)      # pinned, so a later plain rebuild encodes the same
+        save(sb_path, doc)
+    layer_files = None
+    if layered:
+        # two passes (graphic on alpha, background alone) and an ffmpeg composite for the preview;
+        # the composite lands at render_rel, so posters, checks and the board see no difference
+        try:
+            layer_files = layers.render_layers(graphics_dir_abs, name,
+                                               fast_capture=args.fast_capture, crf=crf,
+                                               hf_pkg=HF_PKG)
+        except RuntimeError as e:
+            print(e)
+            die("layered render failed")
+    else:
+        proc = run(render_cmd, cwd=graphics_dir_abs)
+        if proc.returncode != 0:
+            print(proc.stdout)
+            print(proc.stderr)
+            die("render failed")
+        print(f"  rendered {render_rel}")
 
     # ---- copy into the project's assets/ ----
     src = os.path.join(graphics_dir_abs, render_rel)
@@ -221,6 +323,21 @@ def main():
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copy2(src, dst)
     print(f"  copied -> {asset_file_rel}")
+    if layer_files:
+        delivered = {}
+        for key, ext in (("graphic", "graphic.mov"), ("bg", "bg.mp4")):
+            rel = f"assets/{name}.{ext}"
+            shutil.copy2(os.path.join(graphics_dir_abs, layer_files[key]), os.path.join(project_dir, rel))
+            delivered[key] = rel
+            print(f"  copied -> {rel}")
+        # `file` stays the composited preview; the editor's deliverables are listed beside it
+        for _row, asset in referencing:
+            asset["layers"] = dict(delivered)
+        save(sb_path, doc)
+    elif any("layers" in asset for _row, asset in referencing):
+        for _row, asset in referencing:      # composition no longer layered: drop the stale pointers
+            asset.pop("layers", None)
+        save(sb_path, doc)
 
     # ---- posters, cut straight from the board ----
     if not poster_plan:
@@ -253,6 +370,10 @@ def main():
     # ---- xlsx ----
     if not args.no_xlsx:
         xlsx_name = find_xlsx(project_dir, doc)
+        kept = archive_if_commented(project_dir, xlsx_name)
+        if kept:
+            print(f"  ! {xlsx_name} carries reviewer comments — archived to {kept} before overwrite")
+            print(f"    read them in with: python3 {INGEST_SHEET_COMMENTS} storyboard.json \"{kept}\" --apply")
         proc = run(["python3", SB_TO_XLSX, "storyboard.json", xlsx_name], cwd=project_dir)
         if proc.returncode != 0:
             print(proc.stdout)

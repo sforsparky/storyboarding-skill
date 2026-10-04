@@ -78,7 +78,10 @@ function findBrowser() {
 const IGNORE_ID_SELECTORS = ["#root", "#bg", "#vign", "#meshfx"];
 const IGNORE_CLASS_SELECTORS = [".stage", ".world"];
 const IGNORE_TAG_SELECTORS = ["canvas", "html", "body", "script", "style", "head", "link", "meta"];
-const DEFAULT_EXTRA_IGNORE = [".ledge", "#spot"];
+const DEFAULT_EXTRA_IGNORE = [".ledge", "#spot", "[data-check-ignore]"];
+// [data-check-ignore] is the composition's own opt-out: put it on an element whose edges
+// are deliberate (a meter fill inside a rounded track, a bleed layer) with a comment saying
+// why. Declaring it next to the markup beats a per-row flag nobody remembers to pass.
 
 async function collectFrameReport(page, extraIgnoreCSV) {
   const extraIgnore = (extraIgnoreCSV || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -152,6 +155,11 @@ async function collectFrameReport(page, extraIgnoreCSV) {
       // border reference. `ignored` alone also covers its descendants (e.g. the shadow `i`
       // inside it) — those are NOT safe self-references (their own edge is exactly what a
       // gradient/overlay defect would show up as), so check_row.py keeps the two apart.
+      // [data-check-overlap] is the NARROW opt-out, for a group whose members are meant to
+      // overlap each other and to leave the frame (a product spread under a moving camera).
+      // Unlike [data-check-ignore] it keeps the element trusted for the edge checks — its
+      // edges are real art edges, not the soft border of a bleed layer.
+      const overlapOk = !!el.closest("[data-check-overlap]");
       const selfIgnored = ignoreSel.length > 0 && el.matches(ignoreSel.join(","));
       const ignored = selfIgnored || (ignoreSel.length > 0 && !!el.closest(ignoreSel.join(",")));
 
@@ -166,8 +174,15 @@ async function collectFrameReport(page, extraIgnoreCSV) {
       if (Number.isNaN(lineHeight)) lineHeight = fontSize * 1.2;
       const hasText = hasDirectText(el);
 
+      // an <svg> that fills its own parent is a drawing layer, not an icon — its box says
+      // nothing about what is painted inside it (see is_content in check_row.py)
+      const pr = el.parentElement ? el.parentElement.getBoundingClientRect() : null;
+      const fillsParent = !!pr && pr.width > 0 && pr.height > 0 &&
+        (rect.width * rect.height) / (pr.width * pr.height) >= 0.88;
+
       out.push({
         tag,
+        fillsParent,
         id: el.id || null,
         classes: Array.from(el.classList || []),
         bbox: { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom },
@@ -183,6 +198,7 @@ async function collectFrameReport(page, extraIgnoreCSV) {
         borderRadius: parseFloat(cs.borderTopLeftRadius) || 0,
         boxShadow: cs.boxShadow || "none",
         path: domPath(el),
+        overlapOk,
         ignored,
         selfIgnored,
       });

@@ -38,7 +38,9 @@
 </head>
 <body>
 <div id="root" data-composition-id="glass-cards" data-start="0" data-duration="5" data-width="1920" data-height="1080" data-fps="30">
-  <div id="bg"></div><div id="vign"></div>
+  <!-- data-sb-layer="bg": the background is delivered as its own asset and the graphic on alpha
+       (see "Delivery layers" in SKILL.md). Background elements must be direct children of the root. -->
+  <div id="bg" data-sb-layer="bg"></div><div id="vign" data-sb-layer="bg"></div>
 
   <div id="kick"><div class="disp">Three Reasons It Works</div></div>
 

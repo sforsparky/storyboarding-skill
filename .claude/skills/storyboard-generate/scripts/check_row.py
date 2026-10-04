@@ -188,6 +188,11 @@ def is_content(el, width, height):
     if el["hasText"] or el["tag"] == "img":
         return True
     if el["tag"] == "svg":
+        # A route/gauge svg that fills its own container is a drawing layer even when it is
+        # small against the frame: the markers and labels pinned onto the path it draws are
+        # SUPPOSED to sit on top of it, and scoring that as an overlap buries the real ones.
+        if el.get("fillsParent"):
+            return False
         b = el["bbox"]
         return (b["r"] - b["l"]) * (b["b"] - b["t"]) < CANVAS_AREA_FRACTION * width * height
     return False
@@ -198,6 +203,8 @@ def check_off_frame(elements, width, height):
     for el in elements:
         if not is_content(el, width, height):
             continue
+        if el.get("overlapOk"):
+            continue                     # a camera move is supposed to take these off-frame
         b = effective_bbox(el)
         sides = [
             ("left", -MARGIN_OFF_FRAME - b["l"]),
@@ -222,6 +229,9 @@ def check_overlap(elements, width, height):
             a, b = candidates[i], candidates[j]
             if is_ancestor(a["path"], b["path"]) or is_ancestor(b["path"], a["path"]):
                 continue
+            if a.get("overlapOk") and b.get("overlapOk"):
+                continue                 # both inside a group that overlaps by design
+
             ba, bb = effective_bbox(a), effective_bbox(b)
             ow = min(ba["r"], bb["r"]) - max(ba["l"], bb["l"])
             oh = min(ba["b"], bb["b"]) - max(ba["t"], bb["t"])
