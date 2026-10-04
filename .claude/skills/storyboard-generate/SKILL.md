@@ -116,8 +116,9 @@ they can keep, swap or drop. The board still has to show the frame as designed.
 - Verify a layered render the first time on a project: a corner pixel of an extracted RGBA frame
   has alpha 0 (`pix_fmt` alone proves nothing), the `.mov` has an audio stream when the row has
   sfx, and the composite matches a `--no-layers` render at the poster time.
-- Overlays that were always alpha (lower thirds, captions over footage) are unchanged: they have no
-  background layer and render straight to `.mov`.
+- A background that only stands in for footage the editor already has (the presenter behind a
+  talking-head overlay) is marked `data-sb-preview-only`: it composites the board preview but is never
+  delivered — the row's `layers` holds `graphic` alone.
 
 ## Sound effects on graphics (opt-in per row)
 Graphics render silent unless the row has a cue sheet at `<graphics>/sfx/<composition>.json`. With
