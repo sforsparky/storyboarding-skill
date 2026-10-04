@@ -23,10 +23,18 @@ re-render the xlsx; never treat the xlsx as the master.
 1. `/storyboard-build` — script.md → storyboard.json (rows, sections, types, briefs, talking-head reuse).
 3. `/storyboard-generate 7,45` — row brief + brand → HyperFrames graphic (local) or Higgsfield B-roll, named by row.
    With NO selector it renders every free/local asset across the board and stops before paid Higgsfield rows (asks first).
+   Before the first full pass it renders one style sample per visual type / overlay placement and waits
+   for a sign-off (`generate_row.py signoff`), so a project-wide look change costs 5 re-renders, not 40.
+   HyperFrames rows render from `<graphics_dir>/plan.json` via `render_plan.py` (render + register +
+   posters in one pass; `--stale` re-renders only what a change touched).
 3b. `/storyboard-motion` — HyperFrames stills → HTML motion design sheet (approval gate) → animated Higgsfield clips.
 4. Open the rendered `.xlsx` in Google Sheets to review; share the `assets/` clips with your editor.
 
 ## Conventions
+- `storyboard.json` writes go through `generate_row.save`/`editing` (atomic, locked). Never hold a
+  loaded board across a long render and write it back.
+- Unconfirmed facts a graphic asserts are row `assumptions` with an owner (`generate_row.py assume`);
+  they show in amber on the board and the review page until resolved.
 - Assets are named `NNN_slug.ext` (three-digit row number) so `assets/` reads in order and is easy to share.
 - Visual-type vocabulary + colors live once in `.claude/skills/storyboard-build/scripts/lib_types.py`; import it.
 - HyperFrames contract: register the timeline in `window.__timelines`, animate transforms not layout

@@ -13,6 +13,16 @@ frame, and checks the DOM + pixels against the storyboard-generate "Craft standa
                lines (the shelf-shadow bug). Element-based, so it fires even when the step is
                too faint or too short for the pixel scan.
   HARD_EDGE  — a luminance step across a long contiguous run, i.e. a visible crop line
+  WIDOW      — a text element wrapping to 2+ rendered lines (soft wraps AND <br> hand breaks) whose
+               LAST line is narrower than 0.5 x its longest line. Opt out: data-check-widow="off"
+               on the element or an ancestor
+  LABEL_ON_PATH — a text element whose box is crossed by a visible stroked SVG path/line/polyline
+               (sampled every ~4px, honouring dasharray/dashoffset) that is not its ancestor, e.g.
+               a chart label sitting on the chart line. Opt out: data-check-ignore either side
+  SEE_THROUGH — a text/img/svg element with effective opacity strictly between 0.05 and 0.95 that
+               overlaps another content element painted BEHIND it, so the thing behind shows
+               through. Dim with filter:brightness() instead of opacity. Opt out:
+               data-check-ignore / data-check-overlap
 
 Usage:
   check_row.py <storyboard.json> <row-number|name-fragment> [--at t1,t2,...] [--out DIR]
@@ -40,6 +50,11 @@ HARD_EDGE_MIN_RUN = 60
 HARD_EDGE_STEP = 1
 HARD_EDGE_ELEMENT_MARGIN = 3
 HARD_EDGE_FRAME_MARGIN = 3
+WIDOW_RATIO = 0.5
+WIDOW_MIN_LINE_PX = 24          # ignore degenerate measurements (a longest line this short is noise)
+LABEL_PATH_SHRINK = 2
+SEE_THROUGH_MIN_OPACITY = 0.05
+SEE_THROUGH_MAX_OPACITY = 0.95
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +253,84 @@ def check_overlap(elements, width, height):
             if ow > OVERLAP_MIN and oh > OVERLAP_MIN:
                 findings.append({
                     "a": label(a), "b": label(b),
+                    "intersection": {"w": round(ow, 1), "h": round(oh, 1)},
+                })
+    return findings
+
+
+def check_widow(elements):
+    """A wrapped text element whose last rendered line is under half its longest line. Lines come
+    from the probe (Range rects grouped by line), so <br> hand breaks count like soft wraps."""
+    findings = []
+    for el in elements:
+        if el.get("ignored") or el.get("widowOff"):
+            continue
+        w = el.get("wrap")
+        if not w or w["n"] < 2 or w["max"] < WIDOW_MIN_LINE_PX:
+            continue
+        if w["last"] < WIDOW_RATIO * w["max"]:
+            findings.append({
+                "element": label(el), "id": el.get("id"), "lines": w["n"],
+                "last_w": round(w["last"], 1), "longest_w": round(w["max"], 1),
+                "ratio": round(w["last"] / w["max"], 2),
+            })
+    return findings
+
+
+def check_label_on_path(elements, strokes, width, height):
+    """A text element whose (2px-shrunk) box contains a sampled point of a stroked SVG path that
+    is not its ancestor — e.g. a chart label sitting on the chart line."""
+    findings = []
+    texts = [el for el in elements if el["hasText"] and not el.get("ignored")]
+    for st in strokes:
+        if st.get("ignored"):
+            continue
+        for el in texts:
+            if is_ancestor(st["path"], el["path"]):
+                continue
+            b = effective_bbox(el)
+            l, t = b["l"] + LABEL_PATH_SHRINK, b["t"] + LABEL_PATH_SHRINK
+            r, bo = b["r"] - LABEL_PATH_SHRINK, b["b"] - LABEL_PATH_SHRINK
+            hits = [p for p in st["pts"] if l <= p[0] <= r and t <= p[1] <= bo]
+            if hits:
+                findings.append({
+                    "element": label(el), "id": el.get("id"),
+                    "path": label(st), "path_id": st.get("id"),
+                    "samples_inside": len(hits), "at": hits[len(hits) // 2],
+                })
+    return findings
+
+
+def check_see_through(elements, width, height):
+    """A translucent content element (effective opacity strictly between 0.05 and 0.95) with
+    another content element painted behind it under its box. The probe resolves paint order via
+    elementsFromPoint; filter:brightness dimming leaves opacity at 1, so it never lands here."""
+    findings = []
+    seen = set()
+    for a in elements:
+        op = a.get("opacity", 1)
+        if not (SEE_THROUGH_MIN_OPACITY < op < SEE_THROUGH_MAX_OPACITY):
+            continue
+        if not is_content(a, width, height):
+            continue
+        for j in a.get("behind", []):
+            b = elements[j]
+            if not is_content(b, width, height):
+                continue
+            if is_ancestor(a["path"], b["path"]) or is_ancestor(b["path"], a["path"]):
+                continue
+            if a.get("overlapOk") and b.get("overlapOk"):
+                continue                 # both inside a group that overlaps by design
+            ba, bb = effective_bbox(a), effective_bbox(b)
+            ow = min(ba["r"], bb["r"]) - max(ba["l"], bb["l"])
+            oh = min(ba["b"], bb["b"]) - max(ba["t"], bb["t"])
+            if ow > OVERLAP_MIN and oh > OVERLAP_MIN:
+                key = (tuple(a["path"]), tuple(b["path"]))
+                if key in seen:
+                    continue
+                seen.add(key)
+                findings.append({
+                    "front": label(a), "opacity": round(op, 2), "behind": label(b),
                     "intersection": {"w": round(ow, 1), "h": round(oh, 1)},
                 })
     return findings
@@ -505,6 +598,9 @@ def main():
         headlines, line_violations = check_lines(elements)
         hard_edge = check_hard_edges(fr["png"], elements, width, height)
         soft_edge = check_soft_edges(elements, width, height)
+        widow = check_widow(elements)
+        label_on_path = check_label_on_path(elements, fr.get("strokes", []), width, height)
+        see_through = check_see_through(elements, width, height)
 
         findings = {
             "off_frame": off_frame,
@@ -512,6 +608,9 @@ def main():
             "lines": line_violations,
             "hard_edge": hard_edge,
             "soft_edge": soft_edge,
+            "widow": widow,
+            "label_on_path": label_on_path,
+            "see_through": see_through,
         }
         passed = not any(findings.values())
         any_finding = any_finding or not passed

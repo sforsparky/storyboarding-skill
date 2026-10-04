@@ -33,16 +33,48 @@ Route by `visual_type` (see `../storyboard-build/scripts/lib_types.py` GENERATED
 
 ## Whole-board default (no selector)
 `/storyboard-generate` with no argument does NOT blindly render everything — it protects credits:
+0. **Style gate first.** Until the board carries a `style_signoff`, the plan leads with the style
+   samples: one pending row per visual type the free route renders, and one per overlay placement
+   (`generate_row.py plan storyboard.json --samples` lists only these). Render ONLY those, show them,
+   and settle every project-wide call before the full pass — ground (light/dark), overlay style
+   (cards or type over footage), quote marks, number formats, and every figure a graphic asserts
+   (record unconfirmed ones with `assume`, below). Then `generate_row.py signoff storyboard.json
+   "<who>" "<what was agreed>"`. A look corrected after 40 rows costs 40 re-renders; corrected
+   after 5 it costs 5.
 1. Print the plan: `generate_row.py plan storyboard.json`. It buckets pending rows into free/local
    (route `hyperframes` / `still` / `placeholder`, honoring any per-row `motion_engine: hyperframes`
    override) versus paid Higgsfield (route `video`), and skips rows already `Generated`/`Approved`.
    - The plan ends with an "Open feedback" section: rows whose feedback is newer than what was
      last generated for them (see "Editing a generated row" below) — check these before generating.
+   - Then "Open assumptions": facts the board asserts that a named person must still confirm.
 2. Generate the free/local rows now — this is the "render all the infographics" pass, and it spends
    nothing. Apply the custom-graphic grouping rules (consecutive graphic beats → one graphic).
+   Put each composition's rows in `<graphics_dir>/plan.json` and render them all with
+   `render_plan.py` (see "Rendering: plan.json" below).
 3. STOP before the paid rows. Show the user the Higgsfield B-roll list and the estimated credits,
    and ask before generating them (or tell them to run `/storyboard-generate b-roll`). Only proceed
    on an explicit yes, and preflight exact cost with `get_cost:true` at that point.
+
+## Assumptions — facts that need a named person to confirm
+A graphic often asserts something you inferred: a scaled figure, a reworded quote, a button label,
+rights to a logo or a testimonial. Record it on the row instead of leaving it in chat:
+`generate_row.py assume storyboard.json <selector> "<what was assumed, and what to confirm>" --owner <name>`.
+It shows in amber on the board's Feedback column and as a "Needs confirmation" callout on the review
+page, and `plan` lists it until it is closed: `generate_row.py resolve storyboard.json <selector>
+--assumptions` (or `--id <id>` for one). Mention open ones whenever you hand the board over.
+
+## Rendering: plan.json (one pass per composition)
+`<graphics_dir>/plan.json` says which rows each composition covers:
+`{"<NNN_slug>": {"rows": [first, last], "cuts": [0, t1, …, dur], "poster_times": [t, …], "kind": "custom_graphic"}}`
+(one `cuts` boundary per row plus the end; one poster time per row, at the moment its beat has
+settled). With an entry there, `rebuild.py` renders, then registers those rows itself — segment,
+`poster_t`, `layers`, kind — re-reading the board under a lock so nothing edited meanwhile is lost,
+and cuts each row's poster. No register → render → register dance, no fix-ups afterwards.
+- `render_plan.py storyboard.json [name-fragment …] [--stale] [--rows A-B] [--dry-run]` renders the
+  plan and rebuilds the xlsx once. `--stale` renders only compositions older than their HTML or
+  anything in `shared/`/`assets/` — after a style change, that is exactly what it touched.
+- `make_overlays.py` writes plan entries for overlays; add entries by hand for authored graphics.
+- `register_clip` remains for Higgsfield clips and anything rendered outside the plan.
 
 ## Video is silent by default
 Every generated video is delivered with **no audio** — the video editor sets all sound and music — except HyperFrames graphics a row explicitly opts into sound effects for (see "Sound effects on graphics"), and even then never music or voice.
@@ -116,7 +148,7 @@ generated row:
    the HyperFrames composition for a graphic row, or the Higgsfield prompt for a video row.
    Later feedback supersedes earlier where they conflict; treat the newest as authoritative.
    Run `generate_row.py feedback storyboard.json <n>` to review a row's pending notes first.
-3. `register`/`register_clip` overwrite the row's `assets[]` (stamping `registered_at`), so the
+3. `rebuild.py` (via plan.json) / `register` / `register_clip` overwrite the row's `assets[]` (stamping `registered_at`), so the
    new asset replaces the old and status returns to `Generated` — this also clears the row from
    `plan`'s "Open feedback" section, since the regenerate is now newer than the feedback that
    prompted it. An explicit row selector regenerates even a `Generated`/`Approved` row (unlike
@@ -241,7 +273,11 @@ the project's `brand.json` (`typography.headline_case`, `motifs`, `graphic_style
   composition's real timeline to every referencing row's poster_t plus each segment boundary
   ±0.4s, then reports OFF_FRAME, OVERLAP, headline LINES>2, HARD_EDGE (a luminance step along a
   long run) and SOFT_EDGE (a linear-gradient box with no border/radius whose ends stop inside the
-  frame — the shelf-shadow bug, caught from the DOM even when the pixel step is faint) per frame,
+  frame — the shelf-shadow bug, caught from the DOM even when the pixel step is faint), WIDOW (a
+  wrapped or hand-broken text block whose last line is under half its longest; opt out with
+  `data-check-widow="off"`), LABEL_ON_PATH (a text box crossed by the drawn part of a stroked SVG
+  path — the label sitting on the chart line) and SEE_THROUGH (a translucent element in front of
+  other content — dim with `filter:brightness`, not opacity) per frame,
   plus a labelled contact sheet and `report.json`; `--at t1,t2` checks specific times, `--strict`
   exits 1 on any finding. `scripts/rebuild.py` runs it at every poster time after each render and
   exits 3 on a failure (render and posters are kept so you can look; `--no-check` to accept).
@@ -278,14 +314,11 @@ the project's `brand.json` (`typography.headline_case`, `motifs`, `graphic_style
    row (talking head / B-roll) interrupts the run, or a new section header begins. State the
    grouping you chose (which rows became one graphic, and why) so the user can correct it.
    - **Merged run →** author ONE composition whose single `paused` timeline sequences the beats;
-     render once named by the FIRST row (`<AAA>_slug.mp4`); register with the shared-clip helper
-     so each row carries its in/out segment:
-     `generate_row.py register_clip <sb.json> <A> <B> <file_rel> <poster_rel> custom_graphic hyperframes <total_dur> [t0 t1 …]`
-     (pass the beat boundaries as the trailing cut points when you know them). The one graphic is shared
-     once and each row carries its in/out — same as a Higgsfield `clip`.
-     **Each row also gets its OWN poster**, cut from inside its segment — see "Per-beat posters" below.
-     You authored the timeline, so you know when each beat settles: pass `--poster-times` rather
-     than letting the fraction guess.
+     render once named by the FIRST row (`<AAA>_slug.mp4`); add a plan.json entry with the rows,
+     the beat boundaries as `cuts` and each beat's settle time as `poster_times`, then render with
+     `rebuild.py`/`render_plan.py` — each row gets its in/out segment and its OWN poster (see
+     "Rendering: plan.json" and "Per-beat posters"). You authored the timeline, so you know when
+     each beat settles: give explicit poster times rather than letting a fraction guess.
    - **Standalone rows →** render each individually per the steps below.
 1. Pick or author a composition under `templates/<name>/index.html`. Start from a template (e.g.
    `portfolio-bar-drop`) or `npx hyperframes catalog --query "..."` then `npx hyperframes add`.
@@ -303,8 +336,8 @@ the project's `brand.json` (`typography.headline_case`, `motifs`, `graphic_style
 5. `npx hyperframes render --quality high --output <NNN_slug>.mp4`; poster:
    `ffmpeg -y -ss <hold-time> -i <NNN_slug>.mp4 -frames:v 1 <NNN_slug>.png`. Graphics have no
    audio track already, so no stripping needed. Normally use `scripts/rebuild.py` for this instead
-   of running render + ffmpeg by hand — it also copies into the project's `assets/`, re-cuts every
-   referencing row's poster from the board, and refreshes the xlsx in one step.
+   of running render + ffmpeg by hand — it also copies into the project's `assets/`, registers the
+   plan.json rows, cuts every row's poster from the board, and refreshes the xlsx in one step.
 
 ## B-ROLL / B-ROLL-GRAPHIC / TESTIMONIAL → Higgsfield (silent)
 1. Build a prompt from the row `brief` + brand `broll_style` so clips share one look project-wide.
@@ -369,37 +402,38 @@ later, feed into image-to-video to make clips. Each row gets its own still image
 4. To turn an approved still into motion later, run `/storyboard-generate clip` on that row (or range) using
    the still as the start frame.
 
-## TALKING HEAD + OVERLAY → transparent overlay, silhouette on the board
+## TALKING HEAD + OVERLAY → transparent overlay, presenter on the board
 The talking head is shot in 4K, waist up, so the editor can reframe it and make room for a graphic.
 These rows ask for the **overlay only**. The footage is captured, and the overlay is never baked into it.
 - **Placement** comes from `visual_direction`/`brief`. With `lower third`, the presenter stays centred. With `right`,
   the overlay fills roughly the right 45% and the presenter is reframed left. `left` is the mirror image. Keep the overlay
   clear of the presenter's half, and keep it within title-safe margins (5%).
-- **Make the presenter silhouette the composition's background layer.** Use an `<img data-sb-layer="bg" data-check-ignore>`
-  pointing at a copy of `assets/silhouette/presenter-{center|left|right}.png` in the graphics project
-  (overlay `right` → `presenter-left.png`, `left` → `presenter-right.png`, `lower third` → `presenter-center.png`).
-  `rebuild.py`/`layers.py` then deliver it like any layered graphic:
-  - `<name>.graphic.mov` is the overlay alone on alpha (ProRes 4444). **This is the editor's deliverable.**
-  - `<name>.bg.mp4` is the silhouette alone. Ignore it.
-  - `<name>.mp4` is the overlay over the silhouette. The board thumbnail, posters and checks use this one.
-
-  `data-check-ignore` stops check_row from reporting the full-frame silhouette as overlapping the text.
-  Check the brand's `components_for_video.talking_head_overlay` for the overlay style. Two options:
-  - **Solid cards:** safe over any footage.
-  - **Light type straight on the footage:** the producer darkens that side in the edit. Simulate the darkening in
-    the bg layer only, so the board reads right and the `.graphic.mov` stays type-only. Use this order:
-  1. `register_clip <n> <n> … --poster-times`, so the row replaces its placeholder.
-  2. `rebuild.py`, which renders and records `layers`.
-  3. `register_clip` again, now that the video exists, so each row gets its own poster at `poster_t`.
-  Re-registering the same file keeps `layers`. Register the asset with kind `custom_graphic`: `file` is
-  the playable composite, and the review page treats kind `overlay` as a still. For overlays, keep only
-  `layers.graphic`. The `.bg.mp4` is just the silhouette, so delete it.
+- **Style** comes from the brand: `components_for_video.talking_head_overlay.style` is `light-type`
+  (type straight over the footage, the editor darkens that side) or `cards` (solid cards, safe over
+  anything). If the brand does not say, ask once at the style gate — do not guess and re-render.
+- **Use the kit, don't hand-write compositions.** The project keeps only copy and layout, in
+  `<graphics_dir>/tools/overlay_specs.py` (`SPECS`, `PRESENTER`, `HEAD`; see the docstring of
+  `scripts/make_overlays.py`). Then:
+  1. `presenter_frames.py <presenter still> <graphics_dir>/assets/presenter --name <who>` — the
+     centre / left / right reframes and their `-dim` previews (a stand-in for the editor's grade).
+     Without a presenter still, use the silhouettes in `assets/silhouette/`.
+  2. `make_overlays.py storyboard.json <specs.py> [--only NAME]` — writes each composition (beat
+     lengths from the VO word count), copies the kit (`kit/overlay/sb-overlay.css` + `.js`: zones,
+     light-type rules, hanging quotes, the entrance/exit timing) into `shared/`, and adds plan.json
+     entries.
+  3. `render_plan.py storyboard.json [NAME]`.
+  The presenter frame is the background layer, marked `data-sb-layer="bg" data-sb-preview-only
+  data-check-ignore`: the board shows the overlay over the presenter, the editor receives
+  `<name>.graphic.mov` alone (ProRes 4444 alpha), no `.bg.mp4` is delivered, and the craft check
+  ignores the frame. The row's asset is kind `custom_graphic` with `layers.graphic` only.
+- The brand CSS defines the type classes (`.kicker .h-xl .h-lg .h-md .body .attr .card .pill .icon
+  .rule .num .grad .strike .check .stack .cta`) and `--accent`; the kit only places and recolours
+  them. Secondary lines take class `muted`, never an inline colour.
 - Consecutive overlay rows with the same placement whose notes say "Continues the previous overlay"
-  are ONE composition that builds, for example a checklist adding an item per beat. Group them the way consecutive
-  custom-graphic rows are grouped, and give each row the segment that covers its beat.
+  are ONE spec spanning those rows, for example a checklist adding an item per beat; the builder gets
+  each beat's start time.
 - Before generation, /storyboard-build (`overlay_placeholders.py`) attaches a `kind: "placeholder"` asset (the silhouette with a dashed
-  overlay zone, `assets/_placeholders/overlay-{right|left|lower-third}.jpg`). Replace it with the real asset.
-  Don't append alongside it.
+  overlay zone, `assets/_placeholders/overlay-{right|left|lower-third}.jpg`). Registering the render replaces it.
 - Verify the first one on each project: a corner pixel of an RGBA frame from `.graphic.mov` has alpha 0.
 
 ## TALKING HEAD / + LOWER THIRD / CUTAWAY → still (no generation)
@@ -412,7 +446,10 @@ A card naming the URL/screen to capture; the human records it.
 - Name outputs `NNN_slug.ext` (three-digit row number) so `assets/` is easy to share with the editor.
 - Write the asset into the row's `assets[]`, set `status` to `Generated`, and re-render the board xlsx
   (`/storyboard-build`, or `sb_to_xlsx.py storyboard.json <out>.xlsx`) so the new thumbnail shows.
-- `scripts/generate_row.py` holds plan / add_feedback / feedback / download / silence / register / register_clip helpers.
+- `scripts/generate_row.py` holds plan [--samples] / signoff / assume / add_feedback / feedback / resolve /
+  download / silence / register / register_clip helpers. Every write to storyboard.json is atomic and
+  locked; never hold a loaded board across a long render and save it afterwards.
+- `name_for()` adds the `NNN_` row prefix — a row's `slug` never carries it.
 
 ---
 Timing floors, stagger and exit/entrance guidance adapted from `motion-designer` in

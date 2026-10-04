@@ -34,6 +34,9 @@ re-push.
    `CUSTOM GRAPHIC` for visuals that need the whole screen (charts, montages).
    After writing the board, run `scripts/overlay_placeholders.py storyboard.json`. It gives every overlay
    row a silhouette poster with the overlay zone marked, so the sheet shows the framing before generation.
+   If the brand's `components_for_video.talking_head_overlay.style` is not set (`light-type` = type
+   straight over the footage, the editor darkens that side; `cards` = solid cards), ask the user once
+   now and record it in brand.json — it decides how every overlay row renders.
 4. Mark reuse: when a talking-head beat returns to an identical earlier setup, set `reuse_of`
    to that row's id so the sheet duplicates the still instead of asking for a new one.
 5. Write a `brief` for every non-talking-head row: a generation-ready prompt naming subject,
@@ -48,15 +51,21 @@ re-push.
    `TALKING HEAD + OVERLAY` → `hyperframes` (its overlay is a graphic, the footage is captured). Never
    route text/number/chart graphics through `higgsfield` — i2v warps fine text and data. A user
    can override any row's engine; preserve the override on re-runs.
-7. Emit `storyboard.json` in the project folder with the schema below. Keep row `id` stable across
+7. Record assumptions as you go: any figure you scaled or derived, wording the VO and an on-screen
+   quote disagree on, a label you guessed, rights to a logo or testimonial. Each becomes an entry in
+   the row's `assumptions` with an `owner` (or later: `generate_row.py assume <sb> <rows> "<text>"
+   --owner <name>`). They show on the board and the review page until someone confirms them.
+8. Emit `storyboard.json` in the project folder with the schema below. Keep row `id` stable across
    re-runs so the Sheet updates in place and comments stay attached.
 
 ## Schema (per row)
 `id` (r003), `n` (int), `section`, `visual_type`, `script`, `visual_direction`, `notes`,
-`reuse_of` (id|null), `slug`, `brief`, `motion_engine` (hyperframes|higgsfield|none),
+`reuse_of` (id|null), `slug` (words only — never the `NNN_` row prefix; asset names add it), `brief`, `motion_engine` (hyperframes|higgsfield|none),
 `status` (Draft|Generating|Generated|Approved|Reshoot),
-`assets` [{file, poster, kind, source, duration}], `feedback` [ {who, when, text} ].
-Top level: `project`, `brand`, `presenter`, `sheet_id`, `drive_folder_id`, `sections_order`, `rows`.
+`assets` [{file, poster, kind, source, duration}], `feedback` [ {who, when, text} ],
+`assumptions` [ {id, text, owner, when, resolved_at?} ].
+Top level: `project`, `brand`, `presenter`, `sheet_id`, `drive_folder_id`, `sections_order`, `rows`,
+and once the style samples are agreed, `style_signoff` {when, by, note, samples}.
 
 ## Reproduce or bulk-convert
 `scripts/build_storyboard_json.py <extracted.json> <brand.json> <out storyboard.json>` builds

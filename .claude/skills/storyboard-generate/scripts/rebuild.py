@@ -11,7 +11,15 @@ source of truth — storyboard.json.
 
 Steps: resolve the graphics dir (recorded on the board), resolve the composition file the
 same way rebuild-row.sh did, lint the project, render at high quality, copy the result into
-the project's assets/, cut every referencing row's poster, and refresh the xlsx.
+the project's assets/, register the rows, cut every referencing row's poster, and refresh the xlsx.
+
+Registration comes from <graphics_dir>/plan.json when the composition has an entry there:
+  {"<composition name>": {"rows": [first, last], "cuts": [0, t1, ..., dur],
+                          "poster_times": [t, ...], "kind": "custom_graphic"}}
+— one pass: render, then point those rows at the file (segments, poster_t, layers) and cut
+their posters. Without an entry, rows that already reference assets/<name>.mp4 are re-cut as
+before. The board is re-read and patched under a lock at each write (generate_row.editing),
+never held across the render, so edits made while a render runs survive.
 
 Python 3 stdlib only.
 """
@@ -25,7 +33,8 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
-from generate_row import load, save, BEAT_POSTER_AT  # noqa: E402  (reuse skill conventions)
+from generate_row import (load, editing, assign_clip, clip_bounds,  # noqa: E402
+                          BEAT_POSTER_AT)                              # (reuse skill conventions)
 import layers  # noqa: E402
 
 HF_VERSION = "0.8.34"
@@ -64,9 +73,36 @@ def ensure_graphics_dir(sb_path, doc, dry_run):
         return doc["graphics_dir"], False
     if dry_run:
         return DEFAULT_GRAPHICS_DIR, True
-    doc["graphics_dir"] = DEFAULT_GRAPHICS_DIR
-    save(sb_path, doc)
+    with editing(sb_path) as live:
+        live.setdefault("graphics_dir", DEFAULT_GRAPHICS_DIR)
     return DEFAULT_GRAPHICS_DIR, True
+
+
+def load_plan(graphics_dir_abs):
+    """<graphics_dir>/plan.json — which rows each composition covers. {} when absent."""
+    import json
+    p = os.path.join(graphics_dir_abs, "plan.json")
+    return json.load(open(p)) if os.path.exists(p) else {}
+
+
+def planned_rows(doc, entry, asset_file_rel):
+    """Apply a plan.json entry to an in-memory doc (rows, segments, poster_t). Returns the rows."""
+    a, b = entry["rows"]
+    k = sum(1 for r in doc["rows"] if a <= r["n"] <= b)
+    cuts = entry.get("cuts")
+    total = float(entry.get("duration") or (cuts[-1] if cuts else 0))
+    return assign_clip(doc, a, b, asset_file_rel, entry.get("kind", "custom_graphic"), "hyperframes",
+                       clip_bounds(k, total, cuts), entry.get("poster_times"))
+
+
+def poster_plan_for(doc, asset_file_rel):
+    out = []
+    for row in doc["rows"]:
+        for asset in row.get("assets", []):
+            if asset.get("file") == asset_file_rel and "poster" in asset:
+                t, how = poster_time_for(asset)
+                out.append((row["n"], asset["poster"], t, how))
+    return out
 
 
 def resolve_composition(graphics_dir_abs, query):
@@ -227,24 +263,31 @@ def main():
         return
 
     asset_file_rel = f"assets/{name}.mp4"
+    entry = load_plan(graphics_dir_abs).get(name)
+    if entry:
+        import copy
+        preview = copy.deepcopy(doc)          # what the board will look like after registering
+        planned_rows(preview, entry, asset_file_rel)
+        print(f"  plan.json: rows {entry['rows'][0]}-{entry['rows'][1]}")
+    else:
+        preview = doc
     referencing = [(row, asset) for row in doc["rows"] for asset in row.get("assets", [])
                    if asset.get("file") == asset_file_rel]
-    poster_plan = []
-    for row, asset in referencing:
-        if "poster" not in asset:
-            continue
-        t, how = poster_time_for(asset)
-        poster_plan.append((row["n"], asset["poster"], t, how))
+    poster_plan = poster_plan_for(preview, asset_file_rel)
 
     # A composition that marks its background (data-sb-layer="bg") is delivered as layers: the
     # graphic on alpha, the background on its own, and a composited preview — see layers.py.
+    # A background marked data-sb-preview-only (the presenter frame behind an overlay) is used for
+    # the board preview and never delivered: the editor has the real footage.
     layered = layers.declares_bg_layer(comp_path) and not args.no_layers
+    bg_delivered = layered and not layers.bg_is_preview_only(comp_path)
 
     if args.dry_run:
         print("[dry-run] would lint the project")
         if layered:
-            print(f"[dry-run] layered delivery: would also write assets/{name}.graphic.mov (alpha) "
-                  f"and assets/{name}.bg.mp4; assets/{name}.mp4 becomes their composite")
+            print(f"[dry-run] layered delivery: would also write assets/{name}.graphic.mov (alpha)"
+                  + (f" and assets/{name}.bg.mp4" if bg_delivered else " (bg is preview-only)")
+                  + f"; assets/{name}.mp4 becomes their composite")
         print(f"[dry-run] would render compositions/{name}.html -> "
               f"{graphics_dir_rel}/renders/{name}.mp4 (quality high)")
         print(f"[dry-run] would copy renders/{name}.mp4 -> {asset_file_rel}")
@@ -295,9 +338,11 @@ def main():
         render_cmd += ["--crf", str(crf)]
         print(f"  encoding at crf {crf}")
     if args.crf:
-        for _row, asset in referencing:
-            asset["crf"] = str(args.crf)      # pinned, so a later plain rebuild encodes the same
-        save(sb_path, doc)
+        with editing(sb_path) as live:        # pinned, so a later plain rebuild encodes the same
+            for row in live["rows"]:
+                for asset in row.get("assets", []):
+                    if asset.get("file") == asset_file_rel:
+                        asset["crf"] = str(args.crf)
     layer_files = None
     if layered:
         # two passes (graphic on alpha, background alone) and an ffmpeg composite for the preview;
@@ -323,21 +368,34 @@ def main():
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copy2(src, dst)
     print(f"  copied -> {asset_file_rel}")
+    delivered = {}
     if layer_files:
-        delivered = {}
         for key, ext in (("graphic", "graphic.mov"), ("bg", "bg.mp4")):
             rel = f"assets/{name}.{ext}"
+            if key == "bg" and not bg_delivered:
+                stale = os.path.join(project_dir, rel)
+                if os.path.exists(stale):       # an older render delivered it; the editor must not get it
+                    os.remove(stale)
+                    print(f"  removed {rel} (preview-only background)")
+                continue
             shutil.copy2(os.path.join(graphics_dir_abs, layer_files[key]), os.path.join(project_dir, rel))
             delivered[key] = rel
             print(f"  copied -> {rel}")
-        # `file` stays the composited preview; the editor's deliverables are listed beside it
-        for _row, asset in referencing:
-            asset["layers"] = dict(delivered)
-        save(sb_path, doc)
-    elif any("layers" in asset for _row, asset in referencing):
-        for _row, asset in referencing:      # composition no longer layered: drop the stale pointers
-            asset.pop("layers", None)
-        save(sb_path, doc)
+
+    # ---- register: patch the CURRENT board (re-read under a lock), never the copy loaded before
+    # the render — anything edited while the render ran is kept ----
+    with editing(sb_path) as live:
+        if entry:
+            planned_rows(live, entry, asset_file_rel)
+        for row in live["rows"]:
+            for asset in row.get("assets", []):
+                if asset.get("file") != asset_file_rel:
+                    continue
+                if delivered:       # `file` stays the composited preview; deliverables listed beside it
+                    asset["layers"] = dict(delivered)
+                else:               # composition no longer layered: drop the stale pointers
+                    asset.pop("layers", None)
+        poster_plan = poster_plan_for(live, asset_file_rel)
 
     # ---- posters, cut straight from the board ----
     if not poster_plan:

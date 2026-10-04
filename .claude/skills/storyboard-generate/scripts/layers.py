@@ -14,6 +14,9 @@ Contract (declared by the composition, read here — nothing project-specific li
     its parent
   - everything not marked is the graphic
   - a composition with no marked element is delivered flat, exactly as before
+  - add data-sb-preview-only to a background that is only a stand-in for footage the editor
+    already has (the presenter behind an overlay): it still composites the board preview, but
+    only the graphic layer is delivered
 
 Three outputs from two renders (never a third render for the preview):
   renders/<name>.graphic.mov  ProRes 4444 with alpha — background hidden, page transparent;
@@ -35,6 +38,18 @@ BG_ATTR_RE = re.compile(r"""data-sb-layer\s*=\s*["']bg["']""")
 GRAPHIC_CSS = ('[data-sb-layer="bg"]{display:none!important}'
                'html,body,[data-composition-id]{background:transparent!important}')
 BG_CSS = '[data-composition-id] > *:not([data-sb-layer="bg"]){display:none!important}'
+
+
+PREVIEW_ONLY_RE = re.compile(r"""<[^>]*data-sb-layer\s*=\s*["']bg["'][^>]*>""")
+
+
+def bg_is_preview_only(comp_path):
+    """True when every background element is marked data-sb-preview-only — a stand-in (e.g. the
+    presenter frame behind a talking-head overlay) that makes the board preview read right but is
+    not a deliverable: rebuild.py delivers the graphic layer alone."""
+    with open(comp_path, encoding="utf-8") as f:
+        tags = PREVIEW_ONLY_RE.findall(f.read())
+    return bool(tags) and all("data-sb-preview-only" in t for t in tags)
 
 
 def declares_bg_layer(comp_path):

@@ -22,3 +22,7 @@ _inspiration/
 # OS
 .DS_Store
 node_modules/
+
+# per-project scratch written next to storyboard.json
+.board-cache/
+.storyboard.json.lock

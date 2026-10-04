@@ -38,6 +38,12 @@
   ],
   "broll_style": "One sentence describing the look B-roll should share across a project: lens, grade, setting, mood.",
   "graphic_style": "One sentence describing custom-graphic look: flat vs dimensional, corner radius, background, motion feel.",
-  "_how_to_build": "Drop reference assets (logos, frames, screenshots, style tiles) into this brand's refs/ folder and run /brand \u2014 it fills this file in. You don't have to edit JSON by hand.",
-  "source_palette": []
+  "_how_to_build": "Drop reference assets (logos, frames, screenshots, style tiles) into this brand's refs/ folder and run /brand — it fills this file in. You don't have to edit JSON by hand.",
+  "source_palette": [],
+  "components_for_video": {
+    "talking_head_overlay": {
+      "style": "",
+      "_style": "light-type (type straight over the footage; the editor darkens that side) | cards (solid cards, safe over anything). Asked once at /storyboard-build if empty."
+    }
+  }
 }

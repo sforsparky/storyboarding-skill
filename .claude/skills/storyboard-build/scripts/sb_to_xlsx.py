@@ -14,7 +14,7 @@ written, ● while it is still open. Resolving a comment in Google Sheets does N
 the board is regenerated from storyboard.json, so close notes with `resolve`.
 """
 import datetime as dt
-import json, os, sys
+import hashlib, json, os, sys
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -27,12 +27,53 @@ COLS = {"A":"Line #","B":"Visual","C":"Script","D":"Visual Direction","E":"Notes
         "G":"Feedback"}
 WIDTHS = {"A":7,"B":32,"C":46,"D":40,"E":28,"F":14,"G":44}
 ROW_H = 97   # points; sized so the Visual cell is ~16:9 and a thumbnail fills it
+IMG_W = int(WIDTHS["B"]*7) + 5      # Visual cell, px
+IMG_H = int(ROW_H*4/3)
+THUMB_W = IMG_W*2                    # embedded thumbnail: 2x the displayed width, so it stays sharp when zoomed
+THUMB_QUALITY = 82
 
 def cell(ws,r,c,v,font=None,fill=None,align=WRAP):
     x=ws[f"{c}{r}"]; x.value=v; x.alignment=align
     if font:x.font=font
     if fill:x.fill=fill
     return x
+
+
+_warned_pil = False
+
+def thumb_for(proj_dir, poster):
+    """Downscaled JPEG of a poster, for embedding. The full 1920x1080 PNGs are ~1MB apiece, which
+    made the board tens of MB; a ~2x-cell thumbnail is ~30-60KB. Cached under <project>/.board-cache/
+    (NOT assets/ — that folder is handed to the video editor), keyed on poster path + mtime + size so
+    a thumbnail only regenerates when its poster changes. Falls back to the original poster."""
+    global _warned_pil
+    try:
+        from PIL import Image
+    except ImportError:
+        if not _warned_pil:
+            print("warning: Pillow not installed - embedding full-size posters (big xlsx)", file=sys.stderr)
+            _warned_pil = True
+        return poster
+    st = os.stat(poster)
+    key = hashlib.sha1(f"{os.path.abspath(poster)}|{st.st_mtime_ns}|{st.st_size}|{THUMB_W}|{THUMB_QUALITY}".encode()).hexdigest()[:16]
+    cache = os.path.join(proj_dir, ".board-cache", "thumbs")
+    out = os.path.join(cache, key + ".jpg")
+    if os.path.exists(out):
+        return out
+    try:
+        os.makedirs(cache, exist_ok=True)
+        with Image.open(poster) as im:
+            if im.mode in ("RGBA", "LA", "P"):         # JPEG has no alpha: flatten onto white
+                im = im.convert("RGBA")
+                bg = Image.new("RGB", im.size, "white"); bg.paste(im, mask=im.split()[3]); im = bg
+            else:
+                im = im.convert("RGB")
+            im.thumbnail((THUMB_W, THUMB_W * 9), Image.LANCZOS)
+            im.save(out, "JPEG", quality=THUMB_QUALITY, optimize=True)
+        return out
+    except Exception as e:
+        print(f"warning: thumbnail failed for {poster}: {e}", file=sys.stderr)
+        return poster
 
 
 def _asset_time(proj_dir, row):
@@ -98,6 +139,13 @@ def feedback_block(proj_dir, row):
     return "\n\n".join(lines), open_count
 
 
+def assumption_lines(row):
+    """Unresolved assumptions — open questions about data/wording a named person must confirm —
+    as one line each. Resolved ones (resolved_at set) are left off to keep the board quiet."""
+    return [f"⚠ Confirm ({a.get('owner') or '?'}): {' '.join((a.get('text') or '').split())}"
+            for a in row.get("assumptions") or [] if not a.get("resolved_at")]
+
+
 def main():
     sb_path, out_path = sys.argv[1], sys.argv[2]
     doc = json.load(open(sb_path))
@@ -143,9 +191,9 @@ def main():
              fill=PatternFill("solid",fgColor=color),align=CENTER)
         if poster and os.path.exists(poster):
             try:
-                img=XLImage(poster)
-                img.width  = int(WIDTHS["B"]*7) + 5     # column B width in px
-                img.height = int(ROW_H*4/3)             # row height (pt) in px
+                img=XLImage(thumb_for(proj_dir, poster))
+                img.width  = IMG_W                      # column B width in px (thumbnail is 2x; display size is set here)
+                img.height = IMG_H                      # row height (pt) in px
                 ws.add_image(img,f"B{r}")               # fills the Visual cell edge-to-edge
             except Exception: pass
         cell(ws,r,"C",row.get("script",""),fill=zebra)
@@ -155,9 +203,19 @@ def main():
         cell(ws,r,"F","" if eng=="none" else eng,align=CENTER,fill=zebra)
         # Feedback travels with the board, not with the sheet's own comment anchors
         fb_text, fb_open = feedback_block(proj_dir, row)
-        fb_cell = cell(ws,r,"G",fb_text,fill=zebra)
-        if fb_open:
-            fb_cell.font = Font(color="9A3412", bold=True)
+        asm = assumption_lines(row)
+        if asm:
+            # assumptions go first, bold amber, ahead of the feedback they sit above
+            from openpyxl.cell.rich_text import CellRichText, TextBlock
+            from openpyxl.cell.text import InlineFont
+            parts = [TextBlock(InlineFont(b=True, color="B45309"), "\n".join(asm))]
+            if fb_text:
+                parts.append(TextBlock(InlineFont(b=bool(fb_open), color="9A3412" if fb_open else "000000"), "\n\n" + fb_text))
+            fb_cell = cell(ws,r,"G",CellRichText(*parts),fill=zebra)
+        else:
+            fb_cell = cell(ws,r,"G",fb_text,fill=zebra)
+            if fb_open:
+                fb_cell.font = Font(color="9A3412", bold=True)
         # No cell notes. They used to mirror this column onto column A, but Google Sheets shows a
         # cell note as a COMMENT: reviewers resolved them, and the next rebuild — which knows
         # nothing about a resolve in Sheets — wrote all of them back. They also tripped the
