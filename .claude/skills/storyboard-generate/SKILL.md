@@ -112,6 +112,14 @@ and cuts each row's poster. No register → render → register dance, no fix-up
 - `make_overlays.py` writes plan entries for overlays; add entries by hand for authored graphics.
 - `register_clip` remains for Higgsfield clips and anything rendered outside the plan.
 
+## Placeholder voiceover (free, local)
+`placeholder_vo.py storyboard.json [--voice am_michael] [--speed 1.0] [--rows A-B]` speaks every row's
+script with HyperFrames' local Kokoro TTS into `audio/placeholder-vo/` — one clip per row, the whole
+read joined with short gaps (`placeholder-vo.wav`), and `timings.csv` — then lists graphics shorter
+than their read. A stand-in for timing and first watches, never the final VO. Needs `kokoro-onnx` and
+`soundfile` in the skills repo `.venv` (`HYPERFRAMES_PYTHON` points HyperFrames at it). Spot-check
+numbers by transcribing a clip back (`npx hyperframes transcribe <wav>`).
+
 ## Video is silent by default
 Every generated video is delivered with **no audio** — the video editor sets all sound and music — except HyperFrames graphics a row explicitly opts into sound effects for (see "Sound effects on graphics"), and even then never music or voice.
 - Prefer silent models (`seedance_2_5`). Do not pick audio/lip-sync models (e.g. `kling3_0`'s audio
