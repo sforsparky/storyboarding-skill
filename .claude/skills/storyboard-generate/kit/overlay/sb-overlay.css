@@ -12,6 +12,14 @@
 .zone.right{left:1010px;width:810px;top:140px;height:800px}
 .zone.left{left:100px;width:810px;top:140px;height:800px}
 .zone.lower{left:140px;width:1640px;top:790px;height:220px;flex-direction:row;align-items:flex-end;justify-content:flex-start}
+/* presenter centred, a big lower third centred under them (title-safe, sits on the bottom edge) */
+.zone.center-lower{left:96px;width:1728px;top:640px;height:390px;flex-direction:row;align-items:flex-end;justify-content:center;text-align:center}
+/* presenter centred, items in the side gutters, clear of the face: place each child with
+   class side-l / side-r and a top: offset (the gutters are 520px wide, title-safe) */
+.zone.sides{inset:0;display:block}
+.zone.sides > .side-l,.zone.sides > .side-r{position:absolute;width:520px;display:flex}
+.zone.sides > .side-l{left:96px;justify-content:flex-start}
+.zone.sides > .side-r{right:96px;justify-content:flex-end}
 .bg-sil{position:absolute;inset:0;width:1920px;height:1080px;object-fit:cover}
 
 /* ---------- style "light-type": no cards, light type over the footage ----------

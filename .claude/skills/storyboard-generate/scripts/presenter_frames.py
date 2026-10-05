@@ -8,6 +8,7 @@ Writes, at 1920x1080:
   <name>-center.jpg   the frame as shot (cover-fit)            -> lower-third overlays
   <name>-left.jpg     reframed in, presenter on the LEFT third  -> overlays placed right
   <name>-right.jpg    reframed in, presenter on the RIGHT third -> overlays placed left
+  <name>-sides-dim.jpg   as shot, darkened at both edges        -> "sides" overlays
   …-dim.jpg           each with a darkening gradient on the overlay side — a stand-in for the
                       grade the editor adds, so light type reads on the board. Preview only; it
                       is never delivered (the composition marks it data-sb-preview-only).
@@ -32,7 +33,9 @@ def cover(im, zoom=1.0, subject_x=0.5, target_x=0.5):
 
 
 def darken(im, side, strength=165):
-    """Gradient to black on the overlay side ('right' | 'left' | 'bottom')."""
+    """Gradient to black on the overlay side ('right' | 'left' | 'bottom' | 'sides')."""
+    if side == "sides":
+        return darken(darken(im, "left", strength), "right", strength)
     if side in ("right", "left"):
         col = []
         for x in range(W):
@@ -69,6 +72,10 @@ def main():
             out = os.path.join(a.out_dir, f"{a.name}-{suffix}-dim.jpg")
             darken(fr, side).save(out, quality=92)
             print(out)
+            if suffix == "center":
+                out = os.path.join(a.out_dir, f"{a.name}-sides-dim.jpg")
+                darken(fr, "sides").save(out, quality=92)
+                print(out)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,10 @@ The project keeps only what is its own — the copy and layout of each overlay �
 (conventionally <graphics_dir>/tools/overlay_specs.py):
 
   SPECS = {"005_still-early-boom": (5, 5, "right", lambda b: '<div class="card" data-in="0.30">…</div>'), …}
-            name (NNN_slug)          rows  placement  builder(beat_starts) -> inner html
+            name (NNN_slug)          rows  placement  builder(beat_starts) -> inner html  [, bg image]
+            placements: right | left | lower | center-lower | sides (see kit/overlay/sb-overlay.css);
+            an optional 5th item names a different preview frame in assets/presenter/ (e.g. a
+            screencast stand-in when the overlay sits on screen footage, not the presenter)
   PRESENTER = {"right": "andy-left-dim.jpg", "left": "andy-right-dim.jpg", "lower": "andy-center-dim.jpg"}
             preview frame per placement, in <graphics_dir>/assets/presenter/ (presenter_frames.py)
   HEAD = '<link href="assets/fonts/fonts.css" rel="stylesheet"><link href="shared/brand.css" rel="stylesheet">'
@@ -99,10 +102,12 @@ def main():
     rows = {r["n"]: r for r in sb["rows"]}
 
     entries = {}
-    for name, (a, b, place, build) in mod.SPECS.items():
+    for name, spec in mod.SPECS.items():
+        a, b, place, build = spec[:4]
+        bg = spec[4] if len(spec) > 4 else mod.PRESENTER.get(place)
         if args.only and args.only not in name:
             continue
-        if place not in mod.PRESENTER:
+        if not bg:
             sys.exit(f"error: {name}: placement {place!r} has no PRESENTER frame")
         lens = [beat_len(rows[n].get("script", ""), wps, pad, floor) for n in range(a, b + 1)]
         starts, t = [], 0.0
@@ -114,7 +119,7 @@ def main():
                          "poster_times": posters, "kind": "custom_graphic"}
         print(f"{name}: rows {a}-{b}  {dur:.2f}s  cuts {starts + [dur]}")
         if not args.dry_run:
-            html = page("r" + name[:3], place, build(starts), dur, mod.PRESENTER[place], head)
+            html = page("r" + name[:3], place, build(starts), dur, bg, head)
             with open(os.path.join(gdir, "compositions", name + ".html"), "w") as f:
                 f.write(html)
 

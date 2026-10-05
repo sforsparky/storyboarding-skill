@@ -11,8 +11,10 @@ window.SB_OV = {
     const tl = gsap.timeline({ paused: true });
     const end = dur - this.TAIL;
     document.querySelectorAll("[data-in]").forEach((el) => {
-      const zone = el.closest(".zone");
-      const dx = zone && zone.classList.contains("right") ? 60 : zone && zone.classList.contains("left") ? -60 : 0;
+      // slide in from the side the element sits on: its own side-l/side-r wins over the zone's
+      const side = el.closest(".side-l,.side-r,.zone");
+      const cl = side ? side.classList : { contains: () => false };
+      const dx = cl.contains("right") || cl.contains("side-r") ? 60 : cl.contains("left") || cl.contains("side-l") ? -60 : 0;
       const dy = dx === 0 ? 40 : 0;
       const t = parseFloat(el.dataset.in);
       tl.fromTo(el, { autoAlpha: 0, x: dx, y: dy }, { autoAlpha: 1, x: 0, y: 0, duration: this.IN, ease: this.EASE_IN }, t);
