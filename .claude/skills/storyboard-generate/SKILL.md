@@ -120,6 +120,16 @@ than their read. A stand-in for timing and first watches, never the final VO. Ne
 `soundfile` in the skills repo `.venv` (`HYPERFRAMES_PYTHON` points HyperFrames at it). Spot-check
 numbers by transcribing a clip back (`npx hyperframes transcribe <wav>`).
 
+## Animatic
+`animatic.py storyboard.json [--music track.mp3] [--music-db -20] [--no-labels]` cuts the whole board
+to the placeholder VO: each row holds for its stretch of the read; graphics and footage play their
+own file (a shared clip only its segment), B-roll slows toward the slot then holds, graphics hold
+their last settled frame (never their exit), talking-head rows show the presenter still with a slow
+push-in, and a small row/section label sits top-left. `--music` loops a bed under the VO, faded and
+sidechain-ducked by the voice. Writes `animatic/<Board> Animatic.mp4`; per-row clips cache in
+`.board-cache/animatic/`, so a re-cut after a fix only re-renders what changed. Music must be
+licensed for the use (generated, library, or supplied) — ask before spending credits on it.
+
 ## Video is silent by default
 Every generated video is delivered with **no audio** — the video editor sets all sound and music — except HyperFrames graphics a row explicitly opts into sound effects for (see "Sound effects on graphics"), and even then never music or voice.
 - Prefer silent models (`seedance_2_5`). Do not pick audio/lip-sync models (e.g. `kling3_0`'s audio
