@@ -16,6 +16,8 @@ The project keeps only what is its own â€” the copy and layout of each overlay â
   HEAD = '<link href="assets/fonts/fonts.css" rel="stylesheet"><link href="shared/brand.css" rel="stylesheet">'
             the brand's own stylesheet links (the kit's sb-overlay.css/js are added after them)
   WPS, PAD, MIN_BEAT   optional VO pace overrides (words/sec, air after a beat, shortest beat)
+  POSTER_TIMES = {"018_explode-vs-over": [14.2]}   optional: a beat's poster second when the default
+            (82% through the beat) would land on an element still entering
 
 This engine does everything else, identically on every project:
   - beat lengths from the rows' VO word count, so each row's segment and poster time follow the read
@@ -114,7 +116,8 @@ def main():
         for L in lens:
             starts.append(round(t, 2)); t += L
         dur = round(t, 2)
-        posters = [round(min(s + L * POSTER_AT, dur - 0.5), 2) for s, L in zip(starts, lens)]
+        posters = getattr(mod, "POSTER_TIMES", {}).get(name) or \
+            [round(min(s + L * POSTER_AT, dur - 0.5), 2) for s, L in zip(starts, lens)]
         entries[name] = {"rows": [a, b], "duration": dur, "cuts": starts + [dur],
                          "poster_times": posters, "kind": "custom_graphic"}
         print(f"{name}: rows {a}-{b}  {dur:.2f}s  cuts {starts + [dur]}")
