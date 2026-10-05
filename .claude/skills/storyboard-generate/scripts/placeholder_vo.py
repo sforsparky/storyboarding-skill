@@ -20,10 +20,78 @@ HF_PKG = "hyperframes@0.8.34"
 REPO_VENV = os.path.expanduser("~/Developer/projects/storyboarding-app/.venv/bin/python")
 
 
+ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
+TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+SCALES = [(10**12, "trillion"), (10**9, "billion"), (10**6, "million"), (1000, "thousand")]
+
+
+def words(n):
+    """Integer to words, US style: 22000 -> 'twenty-two thousand', 297 -> 'two hundred ninety-seven'."""
+    n = int(n)
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        return TENS[n // 10] + ("-" + ONES[n % 10] if n % 10 else "")
+    if n < 1000:
+        return ONES[n // 100] + " hundred" + (" " + words(n % 100) if n % 100 else "")
+    for size, name in SCALES:
+        if n >= size:
+            return words(n // size) + " " + name + (" " + words(n % size) if n % size else "")
+
+
+def decimal_words(s):
+    """'1.37' -> 'one point three seven'; '10' -> 'ten'."""
+    whole, _, frac = s.replace(",", "").partition(".")
+    return words(int(whole or 0)) + ("" if not frac else " point " + " ".join(ONES[int(d)] for d in frac))
+
+
+def year_words(y):
+    """2022 -> 'twenty twenty-two', 2005 -> 'two thousand five', 1990 -> 'nineteen ninety'."""
+    hi, lo = divmod(int(y), 100)
+    if hi == 20 and lo < 10:
+        return "two thousand" + (" " + words(lo) if lo else "")
+    return words(hi) + " " + ("hundred" if lo == 0 else ("oh " + words(lo) if lo < 10 else words(lo)))
+
+
+def say_numbers(t):
+    """Every figure in words before the TTS sees it, so '$10,000' is 'ten thousand dollars', never
+    'dollar ten comma zero zero zero' or 'ten dollars thousand'."""
+    scale = r"(?:\s*(million|billion|trillion|thousand|[MBK])\b)?"
+    big = {"M": "million", "B": "billion", "K": "thousand"}
+
+    # an amount describing a noun is said "a ten-thousand-dollar investment", not "ten thousand dollars investment"
+    function_words = {"a", "an", "the", "per", "in", "to", "for", "of", "and", "or", "or", "each", "every", "is",
+                      "was", "a", "right", "now", "today", "back", "up", "down", "on", "at", "into", "with", "from"}
+
+    def money(m):
+        amt, sc, nxt = m.group(1), m.group(2), m.group(3) or ""
+        attributive = nxt[:1].isalpha() and nxt[:1].islower() and nxt.lower() not in function_words
+        if sc:
+            body = f"{decimal_words(amt)} {big.get(sc, sc)}"
+        else:
+            whole, _, cents = amt.replace(",", "").partition(".")
+            body = words(int(whole))
+            if cents and int(cents) and not attributive:
+                return f"{body} dollars and {words(int(cents))} cents{(' ' + nxt) if nxt else ''}"
+            if not attributive and int(whole) == 1:
+                return f"one dollar{(' ' + nxt) if nxt else ''}"
+        if attributive:
+            return body.replace(" ", "-") + "-dollar " + nxt
+        return f"{body} dollars{(' ' + nxt) if nxt else ''}"
+    t = re.sub(r"\$\s?(\d[\d,]*(?:\.\d+)?)" + scale + r"(?:\s+([A-Za-z][\w'’-]*))?", money, t)
+    t = re.sub(r"(\d[\d,]*(?:\.\d+)?)\s?%", lambda m: decimal_words(m.group(1)) + " percent", t)
+    t = re.sub(r"\b(\d[\d,]*)\s?[x×]\b", lambda m: words(int(m.group(1).replace(",", ""))) + " times", t)
+    t = re.sub(r"\b(1[89]\d\d|20\d\d)\b(?!,\d)", lambda m: year_words(m.group(1)), t)   # bare 4-digit years
+    t = re.sub(r"\d[\d,]*(?:\.\d+)?", lambda m: decimal_words(m.group(0)), t)
+    return t
+
+
 def spoken(text):
-    """Script text as it should be read: one paragraph, stage marks out."""
+    """Script text as it should be read: one paragraph, stage marks out, numbers in words."""
     t = re.sub(r"\s*\n\s*", " ", text or "").strip()
     t = t.replace("&", " and ").replace("–", ",").replace("—", ",")
+    t = re.sub(r"\s*/\s*mo(nth)?\b", " a month", t); t = re.sub(r"\s*/\s*y(ea)?r\b", " a year", t)
+    t = say_numbers(t)
     return re.sub(r"\s{2,}", " ", t)
 
 

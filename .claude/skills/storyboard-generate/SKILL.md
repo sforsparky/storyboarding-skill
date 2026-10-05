@@ -114,7 +114,7 @@ and cuts each row's poster. No register → render → register dance, no fix-up
 
 ## Placeholder voiceover (free, local)
 `placeholder_vo.py storyboard.json [--voice am_michael] [--speed 1.0] [--rows A-B]` speaks every row's
-script with HyperFrames' local Kokoro TTS into `audio/placeholder-vo/` — one clip per row, the whole
+script with HyperFrames' local Kokoro TTS into `audio/placeholder-vo/` (figures said in words first: "$10,000 investment" → "a ten-thousand-dollar investment", "$297 a month" → "two hundred ninety-seven dollars a month", years as "twenty twenty-two") — one clip per row, the whole
 read joined with short gaps (`placeholder-vo.wav`), and `timings.csv` — then lists graphics shorter
 than their read. A stand-in for timing and first watches, never the final VO. Needs `kokoro-onnx` and
 `soundfile` in the skills repo `.venv` (`HYPERFRAMES_PYTHON` points HyperFrames at it). Spot-check
