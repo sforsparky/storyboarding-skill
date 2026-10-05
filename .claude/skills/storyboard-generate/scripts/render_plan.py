@@ -17,9 +17,9 @@ Exit 0 when every render passed its craft check, 3 when any was flagged, 1 when 
 """
 import argparse, json, os, subprocess, sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 REBUILD = os.path.join(HERE, "rebuild.py")
-SB_TO_XLSX = os.path.expanduser("~/.claude/skills/storyboard-build/scripts/sb_to_xlsx.py")
+SB_TO_XLSX = os.path.normpath(os.path.join(HERE, "..", "..", "storyboard-build", "scripts", "sb_to_xlsx.py"))
 sys.path.insert(0, HERE)
 from rebuild import find_xlsx, archive_if_commented, DEFAULT_GRAPHICS_DIR  # noqa: E402
 

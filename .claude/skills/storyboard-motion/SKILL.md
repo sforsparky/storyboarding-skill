@@ -1,11 +1,12 @@
 ---
 name: storyboard-motion
 description: >
-  Turn static brand infographic stills into animated clips — but plan first. Build an HTML "motion
+  Turns static brand infographic stills into animated clips — but plans first. Builds an HTML "motion
   design sheet" that proposes, per shot, the animation style, text design, camera angle, camera
   movement, and which ENGINE renders it: deterministic HyperFrames (pixel-exact text/data) or
-  Higgsfield image-to-video (organic/atmospheric). Present it for approval, and ONLY after the user
-  approves, generate the clips (silent). Use to enhance brand infographic stills into high-tech motion.
+  Higgsfield image-to-video (organic/atmospheric). Presents it for approval, and ONLY after the user
+  approves, generates the clips (silent). Use for /storyboard-motion or to turn brand infographic
+  stills into high-tech motion.
 ---
 
 # /storyboard-motion — stills → motion design sheet → animated clips
@@ -71,15 +72,15 @@ through `/general-video` (or `/motion-graphics` for a single ≤10s unit).
 3. `npx hyperframes check` until **0 errors** (fix seek-safety: `fromTo` not CSS+GSAP transform
    conflicts, boundary `tl.set` hard-kills, static `d` before `getTotalLength`, contrast, overlap).
    Snapshot scene midpoints (`npx hyperframes snapshot --at ...`) and eyeball the contact sheet.
-   Then apply the **Craft standards** in `/storyboard-generate` (no overlap, no visible edges on
+   Then apply `../storyboard-generate/references/craft-standards.md` (no overlap, no visible edges on
    soft things, supplied art on top, every set member visible, derived values, verify by
    measurement) — they are the review bar for every frame, motion sheet included.
 4. `npx hyperframes render` → MP4 (silent; the editor sets sound). Copy to `assets/NNN_slug_motion.mp4`.
    **Deliver as layers when the shot has a designed background**: mark the background elements
    `data-sb-layer="bg"` (direct children of the composition root) and render with
-   `python3 ~/.claude/skills/storyboard-generate/scripts/layers.py <graphics_dir> <composition>` instead —
+   `python3 ../storyboard-generate/scripts/layers.py <graphics_dir> <composition>` (path relative to this skill) instead —
    it writes the graphic on alpha (`.graphic.mov`), the background alone (`.bg.mp4`) and a composited
-   `.mp4` for the board. See storyboard-generate → "Delivery layers".
+   `.mp4` for the board. See `../storyboard-generate/references/delivery-layers-and-sfx.md`.
 
 ### 2B · `higgsfield` shots (image-to-video — atmospheric only)
 Per approved shot, image-to-video with the still as the start frame:

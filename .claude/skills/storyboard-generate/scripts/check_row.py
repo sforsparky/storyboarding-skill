@@ -3,7 +3,7 @@
 
 Seeks a composition's registered GSAP timeline to a set of times (by default: every row's
 poster_t plus the transition frames around each internal segment boundary), screenshots each
-frame, and checks the DOM + pixels against the storyboard-generate "Craft standards":
+frame, and checks the DOM + pixels against the storyboard-generate references/craft-standards.md:
 
   OFF_FRAME  — a text/img/svg element whose bbox runs past the 0..1920 x 0..1080 frame
   OVERLAP    — two text/img/svg leaf elements whose boxes intersect (neither is an ancestor)
