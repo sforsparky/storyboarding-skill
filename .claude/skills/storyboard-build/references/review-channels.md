@@ -20,11 +20,19 @@ section banner rows do not throw the mapping off; a comment on a cell with no li
 reported and skipped. Status is never changed — regenerating the row is what settles a comment.
 Both Google-exported threads and Excel's own threaded comments are read.
 
-**Comments do not survive a replaced sheet.** They are anchored to cells in that one spreadsheet:
-re-uploading a fresh xlsx over it (File > Import > Replace) drops every thread. Publish each new
-round as a NEW sheet and leave the commented one as that round's record. Locally, `sb_to_xlsx.py`
-overwrites the workbook in place, so `rebuild.py` now archives any workbook that carries comments
-into `<project>/feedback/` before overwriting it, and prints the ingest command.
+**Comments are carried across rebuilds.** `sb_to_xlsx.py` reads the reviewers' comments out of the
+workbook it is about to overwrite and re-places each on the row with the same Line # (so a comment
+follows its row when rows are added or removed), keeping Google's thread ID in the comment text and
+copying Google's thread data (`xl/commentsmeta0`) across, so Google Sheets re-anchors the original
+threads to their cells instead of listing them as unmapped. A comment whose Line # no longer exists
+is reported, not placed. (Before this, every rebuild dropped them.)
+- Lost them anyway? Restore from an archived copy:
+  `sb_to_xlsx.py storyboard.json "<Board>.xlsx" --carry-comments-from "feedback/<date>_<Board>.xlsx"`
+- `rebuild.py` still archives a commented workbook into `<project>/feedback/` (once a day) as that
+  round's record; `--no-carry` writes a clean board with no comments.
+- Uploading a brand-new file over the sheet (File > Import > Replace) still drops threads — that
+  bypasses the board entirely. Let the synced xlsx update in place instead.
+- Excel's own threaded comments (`xl/threadedComments/`) are not carried yet; Google's format is.
 
 **The board writes no comments of its own.** Feedback renders into the **Feedback** column (G)
 only — never as cell notes: Google Sheets shows a cell note as a comment, so reviewers resolve them,

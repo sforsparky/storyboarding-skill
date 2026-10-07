@@ -114,8 +114,8 @@ without Google access.
 Open `references/review-channels.md` when reviewers have commented in the sheet, when publishing
 the stakeholder review page (`scripts/build_review.py`) or ingesting its payload
 (`scripts/ingest_review.py`), or when a row carries layered assets. Two rules hold everywhere:
-comments do not survive a replaced sheet (publish each round as a NEW sheet), and ingestion never
-lowers a row's status.
+rebuilding the board carries reviewers' comments onto their rows (by Line #) so Google re-anchors
+them, and ingestion never lowers a row's status.
 
 ## Reviewing a script before boarding it (optional)
 `references/script-review-lens.md` is a checklist for reading an incoming script — hook, where proof
