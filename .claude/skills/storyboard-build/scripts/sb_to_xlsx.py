@@ -15,8 +15,9 @@ the board is regenerated from storyboard.json, so close notes with `resolve`.
 
 Reviewers' own comments are CARRIED across a rebuild. Before overwriting, the existing workbook's
 comments are read and re-placed on the row with the same Line # (so they follow their row even when
-rows are added or removed), with Google's thread data (xl/commentsmeta0) copied across, so Google
-Sheets re-anchors the original threads instead of leaving them unmapped:
+rows are added or removed), with Google's thread data (xl/commentsmeta0) copied across. Sheets then
+shows them on their cells (after a restore it re-creates them as new threads with the original
+author, time and text, rather than re-attaching the old ones):
 
   sb_to_xlsx.py <storyboard.json> <out.xlsx> [--carry-comments-from <commented.xlsx>] [--no-carry]
 

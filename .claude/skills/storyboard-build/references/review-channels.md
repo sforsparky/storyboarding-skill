@@ -23,9 +23,11 @@ Both Google-exported threads and Excel's own threaded comments are read.
 **Comments are carried across rebuilds.** `sb_to_xlsx.py` reads the reviewers' comments out of the
 workbook it is about to overwrite and re-places each on the row with the same Line # (so a comment
 follows its row when rows are added or removed), keeping Google's thread ID in the comment text and
-copying Google's thread data (`xl/commentsmeta0`) across, so Google Sheets re-anchors the original
-threads to their cells instead of listing them as unmapped. A comment whose Line # no longer exists
-is reported, not placed. (Before this, every rebuild dropped them.)
+copying Google's thread data (`xl/commentsmeta0`) across. A comment whose Line # no longer exists is
+reported, not placed. (Before this, every rebuild dropped them, and Sheets listed them as unmapped.)
+Observed on the ACM board (2026-10-07): after a restore, Sheets showed the comments on their cells
+again, but as NEW threads (new IDs; original author, time and text kept in the body), not the old
+threads re-attached. Anything resolved in Sheets is gone from the file, so it is not carried.
 - Lost them anyway? Restore from an archived copy:
   `sb_to_xlsx.py storyboard.json "<Board>.xlsx" --carry-comments-from "feedback/<date>_<Board>.xlsx"`
 - `rebuild.py` still archives a commented workbook into `<project>/feedback/` (once a day) as that
