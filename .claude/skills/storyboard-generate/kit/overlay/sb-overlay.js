@@ -4,6 +4,7 @@
    never pops.
      data-strike="<sec>"                       draws a .strike line (CSS var --s 0 -> 1)
      data-count="<to>" data-count-at="<sec>"   counts a number up [data-prefix data-suffix]
+     data-draw="<sec>" [data-draw-dur]        strokes an svg path on (a chart line drawing itself)
    Usage: const tl = SB_OV.build(duration); window.__timelines[id] = tl; */
 window.SB_OV = {
   IN: 0.45, OUT: 0.3, EASE_IN: "power3.out", EASE_OUT: "power2.in", TAIL: 0.35,
@@ -23,6 +24,13 @@ window.SB_OV = {
     });
     document.querySelectorAll("[data-strike]").forEach((el) => {
       tl.fromTo(el, { "--s": 0 }, { "--s": 1, duration: 0.5, ease: "power2.inOut" }, parseFloat(el.dataset.strike));
+    });
+    // line draws: data-draw="<sec>" [data-draw-dur] on an svg path/line strokes it on from start to end
+    document.querySelectorAll("[data-draw]").forEach((el) => {
+      const len = el.getTotalLength ? el.getTotalLength() : 1000;
+      el.style.strokeDasharray = len;
+      tl.fromTo(el, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: parseFloat(el.dataset.drawDur || 1.6),
+        ease: "power2.inOut" }, parseFloat(el.dataset.draw));
     });
     document.querySelectorAll("[data-count]").forEach((el) => {
       const to = parseFloat(el.dataset.count), at = parseFloat(el.dataset.countAt || el.dataset.in || 0);

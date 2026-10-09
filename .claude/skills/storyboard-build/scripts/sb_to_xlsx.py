@@ -12,10 +12,22 @@ round's notes are read back into storyboard.json with ingest_sheet_comments.py a
 A note shows ✔ once resolved (generate_row.py resolve) or when the row's art was made after it was
 written, ● while it is still open. Resolving a comment in Google Sheets does NOT close a note —
 the board is regenerated from storyboard.json, so close notes with `resolve`.
+
+Reviewers' own comments are CARRIED across a rebuild. Before overwriting, the existing workbook's
+comments are read and re-placed on the row with the same Line # (so they follow their row even when
+rows are added or removed), with Google's thread data (xl/commentsmeta0) copied across. Sheets then
+shows them on their cells (after a restore it re-creates them as new threads with the original
+author, time and text, rather than re-attaching the old ones):
+
+  sb_to_xlsx.py <storyboard.json> <out.xlsx> [--carry-comments-from <commented.xlsx>] [--no-carry]
+
+The default source is <out.xlsx> itself. Pass --carry-comments-from to restore comments from an
+archived copy (rebuild.py keeps one in <project>/feedback/) after a rebuild that lost them.
 """
 import datetime as dt
-import hashlib, json, os, sys
-from openpyxl import Workbook
+import hashlib, json, os, re, shutil, sys, tempfile, zipfile
+from openpyxl import Workbook, load_workbook
+from openpyxl.comments import Comment
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Font, PatternFill, Alignment
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -146,8 +158,69 @@ def assumption_lines(row):
             for a in row.get("assumptions") or [] if not a.get("resolved_at")]
 
 
+OUR_AUTHOR = "storyboard"          # notes older versions of this script wrote; never carried
+META_REL = "http://customschemas.google.com/relationships/workbookmetadata"
+
+
+def read_reviewer_comments(xlsx):
+    """[(line_no|None, column, old_ref, text, author)] and Google's thread metadata (bytes|None)
+    from a board workbook. Only reviewers' comments; the Line # comes from column A of the
+    comment's row, which is how it finds its row in the new board."""
+    if not xlsx or not os.path.exists(xlsx):
+        return [], None
+    try:
+        wb = load_workbook(xlsx)
+    except Exception as e:
+        print(f"warning: could not read comments from {xlsx}: {e}", file=sys.stderr)
+        return [], None
+    ws = wb.worksheets[0]
+    found = []
+    for row in ws.iter_rows():
+        for c in row:
+            if c.comment and (c.comment.author or "") != OUR_AUTHOR and c.comment.text.strip():
+                line = ws.cell(c.row, 1).value
+                line = int(line) if isinstance(line, (int, float)) or (isinstance(line, str) and line.isdigit()) else None
+                found.append((line, c.column_letter, c.coordinate, c.comment.text, c.comment.author or ""))
+    meta = None
+    with zipfile.ZipFile(xlsx) as z:
+        for n in z.namelist():
+            if re.fullmatch(r"xl/(?:comments/)?commentsmeta\d*", n):
+                meta = z.read(n)
+    return found, meta
+
+
+def attach_google_meta(path, meta):
+    """Put Google's thread data back next to the comments part openpyxl wrote, so Sheets can match
+    the IDs in each comment ("ID#AAAC…") to its original thread instead of orphaning it."""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx", dir=os.path.dirname(os.path.abspath(path))).name
+    with zipfile.ZipFile(path) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        names = zin.namelist()
+        cparts = [n for n in names if re.fullmatch(r"xl/comments/comment\d+\.xml", n)]
+        for n in names:
+            data = zin.read(n)
+            if n == "[Content_Types].xml":
+                data = data.replace(b"</Types>", b'<Override PartName="/xl/commentsmeta0" '
+                                    b'ContentType="application/binary"/></Types>')
+            zout.writestr(n, data)
+        zout.writestr("xl/commentsmeta0", meta)
+        for cp in cparts:
+            d, b = os.path.split(cp)
+            zout.writestr(f"{d}/_rels/{b}.rels",
+                          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                          f'<Relationship Id="rId1" Type="{META_REL}" Target="../commentsmeta0"/></Relationships>')
+    shutil.move(tmp, path)
+
+
 def main():
-    sb_path, out_path = sys.argv[1], sys.argv[2]
+    argv = sys.argv[1:]
+    carry_from, no_carry = None, "--no-carry" in argv
+    if "--carry-comments-from" in argv:
+        i = argv.index("--carry-comments-from"); carry_from = argv[i + 1]; del argv[i:i + 2]
+    argv = [x for x in argv if x != "--no-carry"]
+    sb_path, out_path = argv[0], argv[1]
+    carried, meta = ([], None) if no_carry else read_reviewer_comments(carry_from or out_path)
+    line_to_row = {}
     doc = json.load(open(sb_path))
     proj_dir = os.path.dirname(os.path.abspath(sb_path))
     wb = Workbook(); ws = wb.active; ws.title = doc.get("project","Storyboard")[:31]
@@ -169,7 +242,7 @@ def main():
             ws.row_dimensions[r].height=26; last_section=sec; r+=1
         vtype=normalize_type(row["visual_type"]); color=VISUAL_TYPES[vtype]
         zebra=PatternFill("solid",fgColor="F2F2F2") if i%2 else None
-        cell(ws,r,"A",row["n"],align=CENTER,fill=zebra)
+        cell(ws,r,"A",row["n"],align=CENTER,fill=zebra); line_to_row[row["n"]] = r
         eng = row.get("motion_engine") or default_motion_engine(vtype)
         # Find a poster: the row's OWN asset wins, and the reused row is only a fallback for a
         # row that has none. Reaching for the reused row first was silently overriding rows that
@@ -231,7 +304,22 @@ def main():
         cell(lg,idx,"B",f"#{cl}",align=CENTER)
     lg.column_dimensions["A"].width=28; lg.column_dimensions["B"].width=12
     lg.sheet_view.showGridLines=False
-    wb.save(out_path); print("Saved",out_path)
+    placed, lost = 0, []
+    for line, col, old_ref, text, author in carried:
+        if line in line_to_row:
+            ws[f"{col}{line_to_row[line]}"].comment = Comment(text, author, width=320, height=180)
+            placed += 1
+        else:
+            lost.append((old_ref, text.splitlines()[-1][:60] if text else ""))
+    wb.save(out_path)
+    if placed and meta:
+        attach_google_meta(out_path, meta)
+    print("Saved", out_path)
+    if carried:
+        print(f"  carried {placed} reviewer comment(s) onto their rows"
+              + (" with Google thread data" if meta and placed else ""))
+    for ref, gist in lost:
+        print(f"  ! comment at {ref} has no matching Line # on the board now — not placed: {gist}")
 
 if __name__=="__main__":
     main()

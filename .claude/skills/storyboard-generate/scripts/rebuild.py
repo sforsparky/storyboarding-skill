@@ -40,10 +40,10 @@ import layers  # noqa: E402
 HF_VERSION = "0.8.34"
 HF_PKG = f"hyperframes@{HF_VERSION}"
 DEFAULT_GRAPHICS_DIR = "videos/vsl-graphics"
-SB_TO_XLSX = os.path.expanduser(
-    "~/.claude/skills/storyboard-build/scripts/sb_to_xlsx.py")
-INGEST_SHEET_COMMENTS = os.path.expanduser(
-    "~/.claude/skills/storyboard-build/scripts/ingest_sheet_comments.py")
+_BUILD_SCRIPTS = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "..", "..", "storyboard-build", "scripts"))
+SB_TO_XLSX = os.path.join(_BUILD_SCRIPTS, "sb_to_xlsx.py")
+INGEST_SHEET_COMMENTS = os.path.join(_BUILD_SCRIPTS, "ingest_sheet_comments.py")
 CHECK_ROW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_row.py")
 
 # Candidate flag names a future hyperframes render might expose for a partial/windowed

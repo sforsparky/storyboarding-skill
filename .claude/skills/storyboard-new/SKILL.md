@@ -1,9 +1,10 @@
 ---
 name: storyboard-new
 description: >
-  Scaffold a self-contained storyboard project IN THE CURRENT FOLDER — a script.md starter, an empty
+  Scaffolds a self-contained storyboard project IN THE CURRENT FOLDER — a script.md starter, an empty
   storyboard.json wired to a brand, assets/, and a brands/<brand>/ copied from the template.
-  Run it inside a folder named for the project. Use when starting a new video before /storyboard-build.
+  Runs inside a folder named for the project. Use for /storyboard-new or when starting a new video,
+  before /storyboard-build.
 ---
 
 # /storyboard-new — scaffold a project
@@ -15,8 +16,8 @@ It creates:
 - `assets/` in the current folder
 - `script.md` — a starter with a `## Hook` heading and a note on how beats/sections parse
 - `storyboard.json` — an empty skeleton with `project` + `brand` set
-- `brands/<brand>/` — the project's own brand, copied from the skills' `_template`
-- `brands/<brand>/` from `brands/_template` **if the brand doesn't exist yet** (with `refs/` and `logos/`)
+- `brands/<brand>/` — the project's own brand, copied from the skills' `brands/_template` **if the
+  brand doesn't exist yet** (with `refs/` and `logos/`)
 
 Defaults: the project name is the current folder's name; the brand is created inside the project
 (named after it) from the skills' `_template`. Pass `--brand acme` to name the brand, `--title` for a
