@@ -42,6 +42,7 @@ VISUAL_TYPE_COLORS = {
     # screen captures = muted teal-grey, B-roll = deep ink-green, overlays = up-green
     "TALKING HEAD": "#2B4547",
     "TALKING HEAD + LOWER THIRD": "#08483B",
+    "TALKING HEAD + OVERLAY": "#08483B",
     "CUSTOM GRAPHIC": "#2F7666",
     "GRAPHIC / SCREENCAST": "#2F7666",
     "SCREENCAST": "#6F8F88",
@@ -300,6 +301,18 @@ body{background:var(--paper);}
   font-size:13px; color:var(--muted); background:var(--surface); border-radius:10px;
   padding:10px 12px;
 }
+.needs-confirm{
+  margin:10px 0; font-size:13px; background:#FFF7E0; border:1px solid #F0C36D;
+  border-left:4px solid #D98E04; border-radius:8px; padding:9px 12px; color:#5C3B00;
+}
+.needs-confirm .nc-title{font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;}
+.needs-confirm ul{margin:0; padding-left:18px;}
+.needs-confirm li{margin:2px 0;}
+.needs-confirm .nc-owner{font-weight:700;}
+.confirm-pill{
+  font-size:11px; font-weight:700; border-radius:999px; padding:4px 10px;
+  background:#FFF7E0; color:#8A5A00; border:1px solid #F0C36D;
+}
 .prior-feedback{margin:10px 0; font-size:13px;}
 .prior-feedback .fb{
   background:var(--surface); border-left:3px solid var(--primary); border-radius:6px;
@@ -380,6 +393,11 @@ def make_placeholder(n, vtype, hint):
     return out_name
 
 
+def open_assumptions(row):
+    """Assumptions nobody has confirmed yet (no resolved_at). Shown to stakeholders, not just --internal."""
+    return [a for a in row.get("assumptions") or [] if not a.get("resolved_at")]
+
+
 def render_row_card(row, media_map, project_dir):
     n = row["n"]
     vtype = row.get("visual_type", "")
@@ -446,12 +464,23 @@ def render_row_card(row, media_map, project_dir):
         fb_html = f'<div class="prior-feedback"><div class="toggle" data-toggle="fb-{n}">Prior notes ({len(feedback)}) ▾</div>' \
                   f'<div class="collapsible" id="fb-{n}">{items}</div></div>'
 
+    asm = open_assumptions(row)
+    asm_html = confirm_pill = ""
+    if asm:
+        items = "".join(
+            f'<li><span class="nc-owner">{esc(a.get("owner") or "?")}:</span> {esc(a.get("text"))}</li>'
+            for a in asm
+        )
+        asm_html = f'<div class="needs-confirm"><div class="nc-title">Needs confirmation</div><ul>{items}</ul></div>'
+        confirm_pill = '<span class="confirm-pill">Needs confirmation</span>'
+
     return f"""
 <div class="card" data-row="{n}">
   <div class="card-head">
     <span class="row-num">{n}</span>
     <span class="type-pill" style="background:{color}">{esc(vtype)}</span>
     <span class="status-pill status-{esc(status)}">{esc(status)}</span>
+    {confirm_pill}
   </div>
   <div class="card-body">
     <div class="media-wrap">{media_html}</div>
@@ -464,6 +493,7 @@ def render_row_card(row, media_map, project_dir):
       </div>
     </div>
   </div>
+  {asm_html}
   {fb_html}
   <div class="controls" data-controls="{n}">
     <div class="verdicts">
@@ -492,6 +522,8 @@ def build_html(doc, media_map, project_dir, title, rows_without_media):
     project_name = esc(doc.get("project", title))
     state_key = "sb_review::" + (doc.get("project") or "storyboard")
     row_count = len(doc["rows"])
+    n_confirm = sum(len(open_assumptions(r)) for r in doc["rows"])
+    confirm_note = f' &middot; <b style="color:#8A5A00">{n_confirm} to confirm</b>' if n_confirm else ""
 
     body = f"""<meta charset="utf-8">
 <title>{esc(title)}</title>
@@ -500,7 +532,7 @@ def build_html(doc, media_map, project_dir, title, rows_without_media):
 <style>{css}</style>
 <div class="sbr">
   <h1>{esc(title)}</h1>
-  <div class="subtitle">{project_name} &middot; {row_count} rows &middot; stakeholder review</div>
+  <div class="subtitle">{project_name} &middot; {row_count} rows{confirm_note} &middot; stakeholder review</div>
   <div class="reviewer-bar">
     <label for="reviewerName">Reviewer name</label>
     <input type="text" id="reviewerName" placeholder="Your name">

@@ -3,7 +3,8 @@
  *
  * Loads a HyperFrames composition over a local http URL, seeks its registered GSAP timeline
  * to a list of times, and for each time captures a full-frame PNG plus an element report
- * (bbox, opacity, text/img content) used by check_row.py's craft checks.
+ * (bbox, opacity, text/img content, rendered text lines, paint-order facts) plus the sampled
+ * points of stroked SVG geometry used by check_row.py's craft checks.
  *
  * Usage: node _probe.mjs <url> <compId> <outDir> <t1,t2,...> <ignoreSelectorsCSV>
  * Prints one JSON object to stdout: { width, height, frames: [{t, png, elements: [...]}] }
@@ -78,7 +79,10 @@ function findBrowser() {
 const IGNORE_ID_SELECTORS = ["#root", "#bg", "#vign", "#meshfx"];
 const IGNORE_CLASS_SELECTORS = [".stage", ".world"];
 const IGNORE_TAG_SELECTORS = ["canvas", "html", "body", "script", "style", "head", "link", "meta"];
-const DEFAULT_EXTRA_IGNORE = [".ledge", "#spot"];
+const DEFAULT_EXTRA_IGNORE = [".ledge", "#spot", "[data-check-ignore]"];
+// [data-check-ignore] is the composition's own opt-out: put it on an element whose edges
+// are deliberate (a meter fill inside a rounded track, a bleed layer) with a comment saying
+// why. Declaring it next to the markup beats a per-row flag nobody remembers to pass.
 
 async function collectFrameReport(page, extraIgnoreCSV) {
   const extraIgnore = (extraIgnoreCSV || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -130,9 +134,52 @@ async function collectFrameReport(page, extraIgnoreCSV) {
       }
       return found ? { l, t, r, b } : null;
     }
+    // Real rendered lines of an element's own text (WIDOW check). Gathers the text nodes the
+    // element itself owns plus those of inline descendants (a <span class="acc"> inside a
+    // headline belongs to the headline's lines), via Range.getClientRects(), then groups the
+    // rects into lines by vertical overlap — so a <br> hand break ends a line exactly like a
+    // soft wrap does. Skips inline elements (their block ancestor measures them) and
+    // flex/grid containers (each direct text node there is its own item, not a wrapped line).
+    function wrapLines(el) {
+      const disp = getComputedStyle(el).display;
+      if (disp === "inline" || disp === "contents" || disp === "none" ||
+          disp.includes("flex") || disp.includes("grid")) return null;
+      const rects = [];
+      (function walk(node) {
+        for (const n of node.childNodes) {
+          if (n.nodeType === 3) {
+            if (n.textContent.trim().length === 0) continue;
+            const range = document.createRange();
+            range.selectNodeContents(n);
+            for (const rc of range.getClientRects()) {
+              if (rc.width > 0.5 && rc.height > 0) rects.push({ l: rc.left, t: rc.top, r: rc.right, b: rc.bottom });
+            }
+          } else if (n.nodeType === 1 && getComputedStyle(n).display === "inline") {
+            walk(n);
+          }
+        }
+      })(el);
+      if (rects.length === 0) return null;
+      rects.sort((a, b) => a.t - b.t || a.l - b.l);
+      const lines = [];
+      for (const rc of rects) {
+        const cy = (rc.t + rc.b) / 2;
+        const ln = lines.find(L => cy > L.t && cy < L.b);
+        if (ln) {
+          ln.l = Math.min(ln.l, rc.l); ln.r = Math.max(ln.r, rc.r);
+          ln.t = Math.min(ln.t, rc.t); ln.b = Math.max(ln.b, rc.b);
+        } else {
+          lines.push({ ...rc });
+        }
+      }
+      lines.sort((a, b) => a.t - b.t);
+      const widths = lines.map(L => L.r - L.l);
+      return { n: lines.length, last: widths[widths.length - 1], max: Math.max(...widths) };
+    }
     const ignoreSel = [...defaultIgnoreSel, ...extraIgnoreSel];
     const all = Array.from(document.querySelectorAll("*"));
     const out = [];
+    const outEls = [];   // parallel to out: live elements, for the paint-order hit tests below
     for (const el of all) {
       const tag = el.tagName.toLowerCase();
       // structural containers: skip recording the element itself, still walk its children
@@ -152,6 +199,11 @@ async function collectFrameReport(page, extraIgnoreCSV) {
       // border reference. `ignored` alone also covers its descendants (e.g. the shadow `i`
       // inside it) — those are NOT safe self-references (their own edge is exactly what a
       // gradient/overlay defect would show up as), so check_row.py keeps the two apart.
+      // [data-check-overlap] is the NARROW opt-out, for a group whose members are meant to
+      // overlap each other and to leave the frame (a product spread under a moving camera).
+      // Unlike [data-check-ignore] it keeps the element trusted for the edge checks — its
+      // edges are real art edges, not the soft border of a bleed layer.
+      const overlapOk = !!el.closest("[data-check-overlap]");
       const selfIgnored = ignoreSel.length > 0 && el.matches(ignoreSel.join(","));
       const ignored = selfIgnored || (ignoreSel.length > 0 && !!el.closest(ignoreSel.join(",")));
 
@@ -166,13 +218,23 @@ async function collectFrameReport(page, extraIgnoreCSV) {
       if (Number.isNaN(lineHeight)) lineHeight = fontSize * 1.2;
       const hasText = hasDirectText(el);
 
+      // an <svg> that fills its own parent is a drawing layer, not an icon — its box says
+      // nothing about what is painted inside it (see is_content in check_row.py)
+      const pr = el.parentElement ? el.parentElement.getBoundingClientRect() : null;
+      const fillsParent = !!pr && pr.width > 0 && pr.height > 0 &&
+        (rect.width * rect.height) / (pr.width * pr.height) >= 0.88;
+
       out.push({
         tag,
+        fillsParent,
         id: el.id || null,
         classes: Array.from(el.classList || []),
         bbox: { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom },
         textBbox: hasText ? textBBox(el) : null,
         hasText,
+        opacity,                       // effective (product of ancestors) — SEE_THROUGH
+        wrap: wrapLines(el),           // {n, last, max} rendered-line widths — WIDOW
+        widowOff: !!el.closest('[data-check-widow="off"]'),
         fontSize,
         lineHeight,
         src: tag === "img" ? (el.currentSrc || el.src || null) : null,
@@ -183,11 +245,103 @@ async function collectFrameReport(page, extraIgnoreCSV) {
         borderRadius: parseFloat(cs.borderTopLeftRadius) || 0,
         boxShadow: cs.boxShadow || "none",
         path: domPath(el),
+        overlapOk,
         ignored,
         selfIgnored,
       });
+      outEls.push(el);
     }
-    return out;
+
+    // ---- paint order for SEE_THROUGH ---------------------------------------------------------
+    // For every translucent content element A (effective opacity strictly between .05 and .95),
+    // list the content elements B whose box intersects A's and that paint BEHIND A. Paint order
+    // is read from the browser itself (elementsFromPoint is topmost-first and honours z-index,
+    // stacking contexts and DOM order), at the centre of the intersection. pointer-events is
+    // forced on while hit testing, otherwise pointer-events:none overlays vanish from the list.
+    const contentish = r => !r.ignored && (r.hasText || r.tag === "img" || r.tag === "svg");
+    const ebox = r => r.textBbox || r.bbox;
+    const pe = document.createElement("style");
+    pe.textContent = "*{pointer-events:auto !important}";
+    document.head.appendChild(pe);
+    const idxIn = (list, X) => { for (let k = 0; k < list.length; k++) if (X.contains(list[k])) return k; return -1; };
+    for (let i = 0; i < out.length; i++) {
+      const a = out[i];
+      if (!(a.opacity > 0.05 && a.opacity < 0.95) || !contentish(a)) continue;
+      const behind = [];
+      for (let j = 0; j < out.length; j++) {
+        const b = out[j];
+        if (j === i || !contentish(b)) continue;
+        if (outEls[i].contains(outEls[j]) || outEls[j].contains(outEls[i])) continue;
+        const A = ebox(a), B = ebox(b);
+        const l = Math.max(A.l, B.l), r = Math.min(A.r, B.r), t = Math.max(A.t, B.t), bo = Math.min(A.b, B.b);
+        if (r - l <= 6 || bo - t <= 6) continue;
+        const list = document.elementsFromPoint((l + r) / 2, (t + bo) / 2);
+        const ia = idxIn(list, outEls[i]), ib = idxIn(list, outEls[j]);
+        if (ia >= 0 && ib >= 0 && ia < ib) behind.push(j);
+      }
+      if (behind.length) a.behind = behind;
+    }
+    pe.remove();
+
+    // ---- stroked geometry for LABEL_ON_PATH --------------------------------------------------
+    // Each visible stroked <path>/<line>/<polyline> is sampled every ~4 screen px along its
+    // length and mapped to the screen through getScreenCTM() (which includes CSS transforms).
+    // stroke-dasharray/dashoffset are honoured (a draw-on line only contributes the portion
+    // currently drawn; dasharray in a pathLength-normalised path is rescaled). Strokes inside
+    // <defs>/clipPath/mask/marker/pattern/symbol or a #bg/#vign/#meshfx/canvas layer are skipped.
+    const strokes = [];
+    for (const el of document.querySelectorAll("svg path, svg line, svg polyline")) {
+      if (el.closest("defs, clipPath, mask, marker, pattern, symbol, #bg, #vign, #meshfx, canvas")) continue;
+      if (typeof el.getTotalLength !== "function") continue;
+      const cs = getComputedStyle(el);
+      if (!cs.stroke || cs.stroke === "none" || !(parseFloat(cs.strokeWidth) > 0)) continue;
+      if (parseFloat(cs.strokeOpacity) === 0 || effectiveOpacity(el) <= 0.05) continue;
+      if (el.getClientRects().length === 0) continue;            // display:none somewhere above
+      const ctm = el.getScreenCTM();
+      if (!ctm) continue;
+      const total = el.getTotalLength();
+      if (!(total > 0)) continue;
+      const scale = Math.hypot(ctm.a, ctm.b) || 1;
+      const step = 4 / scale;
+      let dash = null, period = 0, off = 0;
+      const da = cs.strokeDasharray;
+      if (da && da !== "none" && !da.includes("%")) {
+        dash = da.split(/[\s,]+/).map(parseFloat).filter(x => !Number.isNaN(x));
+        if (dash.length % 2) dash = dash.concat(dash);
+        period = dash.reduce((x, y) => x + y, 0);
+        if (!(period > 0)) dash = null;
+        else {
+          off = parseFloat(cs.strokeDashoffset) || 0;
+          if (el.hasAttribute("pathLength")) {
+            const k = total / parseFloat(el.getAttribute("pathLength"));
+            if (k > 0 && Number.isFinite(k)) { dash = dash.map(x => x * k); period *= k; off *= k; }
+          }
+        }
+      }
+      const drawn = s => {
+        if (!dash) return true;
+        let m = (((s + off) % period) + period) % period;
+        for (let k = 0; k < dash.length; k++) { if (m < dash[k]) return k % 2 === 0; m -= dash[k]; }
+        return true;
+      };
+      const n = Math.min(4000, Math.ceil(total / step));
+      const pts = [];
+      for (let k = 0; k <= n; k++) {
+        const s = Math.min(total, k * step);
+        if (!drawn(s)) continue;
+        const p = el.getPointAtLength(s);
+        const q = new DOMPoint(p.x, p.y).matrixTransform(ctm);
+        pts.push([Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10]);
+      }
+      if (!pts.length) continue;
+      strokes.push({
+        tag: el.tagName.toLowerCase(), id: el.id || null, classes: Array.from(el.classList || []),
+        path: domPath(el),
+        ignored: ignoreSel.length > 0 && !!el.closest(ignoreSel.join(",")),
+        pts,
+      });
+    }
+    return { elements: out, strokes };
   }, [...IGNORE_ID_SELECTORS, ...IGNORE_CLASS_SELECTORS, ...IGNORE_TAG_SELECTORS], DEFAULT_EXTRA_IGNORE, extraIgnore);
 }
 
@@ -241,8 +395,8 @@ async function main() {
       const fname = `f_${t}.png`;
       const fpath = path.join(outDir, fname);
       await page.screenshot({ path: fpath });
-      const elements = await collectFrameReport(page, ignoreCSV);
-      frames.push({ t, png: fpath, elements });
+      const { elements, strokes } = await collectFrameReport(page, ignoreCSV);
+      frames.push({ t, png: fpath, elements, strokes });
     }
 
     console.log(JSON.stringify({ width: 1920, height: 1080, frames }));

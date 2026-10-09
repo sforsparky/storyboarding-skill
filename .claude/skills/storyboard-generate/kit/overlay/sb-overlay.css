@@ -1,0 +1,45 @@
+/* Talking-head overlay kit (storyboard-generate). Load AFTER the brand's own CSS: the brand defines
+   the type and surface classes (.kicker .h-xl .h-lg .h-md .body .attr .card .pill .icon .rule .num
+   .grad .strike .check .stack .cta .lockup-img), this file places them in a zone beside the presenter
+   and, for style "light-type", turns them into light type straight over the footage.
+
+   Tokens the brand may set on :root:  --accent (kicker/rule/pill colour), --ov-ink (headline,
+   default #fff), --ov-muted (secondary lines, default #D5D9DF), --ov-shadow. */
+:root{--ov-ink:#fff;--ov-muted:#D5D9DF;--ov-shadow:0 2px 14px rgba(0,0,0,.35)}
+
+/* ---------- zones (match the placeholders on the board; presenter reframed to the other side) ---------- */
+.zone{position:absolute;display:flex;flex-direction:column;justify-content:center;gap:28px}
+.zone.right{left:1010px;width:810px;top:140px;height:800px}
+.zone.left{left:100px;width:810px;top:140px;height:800px}
+.zone.lower{left:140px;width:1640px;top:790px;height:220px;flex-direction:row;align-items:flex-end;justify-content:flex-start}
+/* presenter centred, a big lower third centred under them (title-safe, sits on the bottom edge) */
+.zone.center-lower{left:96px;width:1728px;top:640px;height:390px;flex-direction:row;align-items:flex-end;justify-content:center;text-align:center}
+/* presenter centred, items in the side gutters, clear of the face: place each child with
+   class side-l / side-r and a top: offset (the gutters are 520px wide, title-safe) */
+.zone.sides{inset:0;display:block}
+.zone.sides > .side-l,.zone.sides > .side-r{position:absolute;width:520px;display:flex}
+.zone.sides > .side-l{left:96px;justify-content:flex-start}
+.zone.sides > .side-r{right:96px;justify-content:flex-end}
+.bg-sil{position:absolute;inset:0;width:1920px;height:1080px;object-fit:cover}
+
+/* ---------- style "light-type": no cards, light type over the footage ----------
+   The editor adds the darkening on the overlay side; the board preview fakes it with a darkened
+   presenter frame (presenter_frames.py). Opt out per composition with class="zone ... cards". */
+.zone:not(.cards){color:var(--ov-ink);text-shadow:var(--ov-shadow)}
+.zone:not(.cards) .card{background:none !important;padding:0 !important;border-radius:0;gap:14px}
+.zone:not(.cards) :is(.h-xl,.h-lg,.h-md,.body,.check span){color:var(--ov-ink) !important}
+.zone:not(.cards) :is(.attr,.check small,.muted){color:var(--ov-muted) !important}
+.zone:not(.cards) .pill{background:none;border:3px solid var(--ov-ink);color:var(--ov-ink)}
+.zone:not(.cards) .pill.accent,.zone:not(.cards) .pill.green{background:var(--accent);border-color:var(--accent);color:#fff}
+.zone:not(.cards) .icon{filter:brightness(0) invert(1)}
+.zone:not(.cards) .num{color:var(--ov-ink)}
+.zone:not(.cards) .grad{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:var(--accent)}
+.zone:not(.cards) .strike::after{background:var(--ov-ink)}
+.zone:not(.cards) .stack{gap:22px}
+
+/* ---------- hanging punctuation ----------
+   The opening quote sits outside the text edge so the words align with everything below:
+   <div class="hang"><span class="hq">“</span>Words…”</div>
+   (CSS hanging-punctuation is Safari-only, so it is done by hand.) */
+.hang{position:relative}
+.hq{position:absolute;left:0;top:0;transform:translateX(-100%)}

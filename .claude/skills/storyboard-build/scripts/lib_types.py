@@ -14,8 +14,15 @@ VISUAL_TYPES = {
     "TALKING HEAD + LOWER THIRD": "00A19A",
     "B-ROLL / GRAPHIC":           "8B5A2B",
     "GRAPHIC / SCREENCAST":       "5B7A99",
+    "TALKING HEAD + OVERLAY":     "C9A227",
 }
 TALKING_HEAD_TYPES = {"TALKING HEAD", "TALKING HEAD + LOWER THIRD"}
+# Talking head shot wide (4K, waist up) and reframed so a transparent graphic overlay fits beside
+# it or as a lower third. NOT in TALKING_HEAD_TYPES: these rows keep brief/direction/notes.
+# Placement lives in visual_direction + brief: "lower third" | "left" | "right" (the side the
+# overlay sits on; the presenter is reframed to the opposite side).
+OVERLAY_TYPES = {"TALKING HEAD + OVERLAY"}
+OVERLAY_PLACEMENTS = ["lower third", "left", "right"]
 GENERATED_BY_TYPE = {  # which /generate route each visual type takes
     "CUSTOM GRAPHIC": "hyperframes",
     "GRAPHIC / SCREENCAST": "hyperframes",
@@ -25,6 +32,7 @@ GENERATED_BY_TYPE = {  # which /generate route each visual type takes
     "SCREENCAST": "placeholder",
     "TALKING HEAD": "still",
     "TALKING HEAD + LOWER THIRD": "still",
+    "TALKING HEAD + OVERLAY": "hyperframes",   # alpha overlay; board poster = overlay over a silhouette
 }
 # Which motion engine animates this type's still into a clip (the /storyboard-motion step).
 #   hyperframes = deterministic HTML/CSS/GSAP render — pixel-exact text/data; DEFAULT for info graphics
@@ -39,6 +47,7 @@ MOTION_ENGINE_BY_TYPE = {
     "SCREENCAST": "none",
     "TALKING HEAD": "none",
     "TALKING HEAD + LOWER THIRD": "none",
+    "TALKING HEAD + OVERLAY": "hyperframes",   # text/data on alpha: never higgsfield
 }
 MOTION_ENGINES = ["hyperframes", "higgsfield", "none"]
 
@@ -67,6 +76,8 @@ def infer_type(direction: str) -> str:
     if not d.strip():
         return "TALKING HEAD"
     has_th = "talking head" in d
+    if "overlay" in d and (has_th or "presenter" in d):
+        return "TALKING HEAD + OVERLAY"
     if "testimonial" in d or "wins channel" in d:
         return "TESTIMONIAL"
     if "screencap" in d or "screen recording" in d or "screencast" in d or "coinmarketcap" in d:

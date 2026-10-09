@@ -98,7 +98,7 @@ async function main() {
       await page.evaluate(() => {
         const style = document.createElement("style");
         style.textContent = `
-          #bg, #vign, #meshfx { display: none !important; }
+          #bg, #vign, #meshfx, [data-sb-layer="bg"] { display: none !important; }
           html, body { background: transparent !important; }
         `;
         document.head.appendChild(style);

@@ -75,6 +75,11 @@ through `/general-video` (or `/motion-graphics` for a single ≤10s unit).
    soft things, supplied art on top, every set member visible, derived values, verify by
    measurement) — they are the review bar for every frame, motion sheet included.
 4. `npx hyperframes render` → MP4 (silent; the editor sets sound). Copy to `assets/NNN_slug_motion.mp4`.
+   **Deliver as layers when the shot has a designed background**: mark the background elements
+   `data-sb-layer="bg"` (direct children of the composition root) and render with
+   `python3 ~/.claude/skills/storyboard-generate/scripts/layers.py <graphics_dir> <composition>` instead —
+   it writes the graphic on alpha (`.graphic.mov`), the background alone (`.bg.mp4`) and a composited
+   `.mp4` for the board. See storyboard-generate → "Delivery layers".
 
 ### 2B · `higgsfield` shots (image-to-video — atmospheric only)
 Per approved shot, image-to-video with the still as the start frame:

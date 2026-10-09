@@ -6,12 +6,40 @@ and a style-linked series (series_id tag). Rendering itself is driven by the ski
 CLI locally, Higgsfield MCP for video); this file is the plumbing so naming and row bookkeeping
 stay consistent.
 """
-import json, os, sys, urllib.request, subprocess, uuid, datetime as dt
+import contextlib, fcntl, json, os, re, sys, tempfile, urllib.request, subprocess, uuid, datetime as dt
 
 def load(p): return json.load(open(p))
-def save(p, d): json.dump(d, open(p, "w"), indent=2)
+
+def save(p, d):
+    """Atomic: write a sibling temp file and rename it over storyboard.json, so a crash or a
+    concurrent reader never sees a half-written board."""
+    fd, tmp = tempfile.mkstemp(prefix=".storyboard.", suffix=".tmp", dir=os.path.dirname(os.path.abspath(p)))
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(d, f, indent=2)
+        os.replace(tmp, p)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(tmp)
+        raise
+
+@contextlib.contextmanager
+def editing(p):
+    """Read-modify-write under a lock: `with editing(sb) as doc: ...` loads the CURRENT board,
+    lets the caller patch it, and saves on exit. Never hold a doc across a long render and save
+    it afterwards — that is how a batch silently overwrote edits made while it ran."""
+    d, b = os.path.split(os.path.abspath(p))
+    with open(os.path.join(d, f".{b}.lock"), "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        doc = load(p)
+        yield doc
+        save(p, doc)
 def row_by_n(doc, n): return next((r for r in doc["rows"] if r["n"] == int(n)), None)
-def name_for(row, ext): return f"{row['n']:03d}_{row.get('slug','shot')}.{ext}"
+def name_for(row, ext):
+    # a slug that already carries its NNN_ prefix would double it (002_002_chart.png) and
+    # collide across rows sharing a clip — strip it; the row number is added here, once
+    slug = re.sub(r"^\d{3}_", "", row.get("slug") or "shot")
+    return f"{row['n']:03d}_{slug}.{ext}"
 
 def now_iso(): return dt.datetime.now().isoformat(timespec="seconds")
 
@@ -81,15 +109,14 @@ def add_feedback(sb_path, selector, text, who="user"):
     {who, when, text, id, rows:[all targeted n]} — so a group note shows on each row's
     board cell but can be recognised as one note via `id`/`rows`. A single-row selector
     still works and now also stamps `when` (today, ISO date) and `id` (rows:[n])."""
-    doc = load(sb_path)
-    ns = parse_selector(selector, doc)
-    entry_id = uuid.uuid4().hex[:8]
-    when = dt.date.today().isoformat()
-    for n in ns:
-        row = row_by_n(doc, n)
-        entry = {"who": who, "when": when, "text": text, "id": entry_id, "rows": list(ns)}
-        row.setdefault("feedback", []).append(entry)
-    save(sb_path, doc)
+    with editing(sb_path) as doc:
+        ns = parse_selector(selector, doc)
+        entry_id = uuid.uuid4().hex[:8]
+        when = dt.date.today().isoformat()
+        for n in ns:
+            row = row_by_n(doc, n)
+            entry = {"who": who, "when": when, "text": text, "id": entry_id, "rows": list(ns)}
+            row.setdefault("feedback", []).append(entry)
     print(f"rows {_fmt_row_range(ns)}: +feedback id={entry_id} ({len(ns)} row(s)): {text}")
     return entry_id
 
@@ -116,14 +143,83 @@ def feedback_cmd(sb_path, selector=None):
         print(f"[{wl}] row {n}{idpart}{rowspart}: {e.get('text', '')}")
 
 
+def resolve_feedback(sb_path, selector="all", entry_id=None, assumptions=False):
+    """Mark feedback resolved: every entry on the selected rows ('all' for the whole board), or
+    only the entry with `entry_id`. Stamps `resolved_at`; nothing is deleted, so the note stays
+    readable on the board (shown ✔) and in `feedback`. With assumptions=True it closes the rows'
+    `assumptions` instead (a confirmed fact); an --id closes that one entry in either list.
+
+    This is the ONLY way a note closes for good. Resolving a comment in Google Sheets does not
+    reach storyboard.json, and a regenerate newer than a note is only a guess — an undated note,
+    or a record-keeping note written just after the render it describes, never clears that way."""
+    field = "assumptions" if assumptions else "feedback"
+    with editing(sb_path) as doc:
+        ns = [r["n"] for r in doc["rows"]] if str(selector).lower() == "all" else parse_selector(selector, doc)
+        stamp, count = now_iso(), 0
+        for n in ns:
+            row = row_by_n(doc, n)
+            # an --id names one entry wherever it lives, feedback or assumption
+            entries = (row.get("feedback") or []) + (row.get("assumptions") or []) if entry_id \
+                else row.get(field) or []
+            for e in entries:
+                if e.get("resolved_at") or (entry_id and e.get("id") != entry_id):
+                    continue
+                e["resolved_at"] = stamp
+                count += 1
+    what = "item(s)" if entry_id else ("assumption(s)" if assumptions else "feedback entr(y/ies)")
+    print(f"resolved {count} {what}"
+          + (f" (id={entry_id})" if entry_id else "") + f" on row(s) {_fmt_row_range(ns) if ns else '-'}")
+    return count
+
+
+def assume(sb_path, selector, text, owner=""):
+    """Record an assumption the board is built on — a figure, a wording, a rights question that a
+    named person must confirm. It lives on the row (not in a chat transcript), shows on the board
+    and the review page until `resolve --assumptions` (or `resolve --id`) closes it, and `plan`
+    lists everything still open."""
+    with editing(sb_path) as doc:
+        ns = parse_selector(selector, doc)
+        entry_id = uuid.uuid4().hex[:8]
+        for n in ns:
+            row_by_n(doc, n).setdefault("assumptions", []).append(
+                {"id": entry_id, "text": text, "owner": owner,
+                 "when": dt.date.today().isoformat(), "rows": list(ns)})
+    print(f"rows {_fmt_row_range(ns)}: +assumption id={entry_id}"
+          + (f" (confirm: {owner})" if owner else "") + f": {text}")
+    return entry_id
+
+
+def _print_open_assumptions(doc):
+    seen, lines = set(), []
+    for r in doc["rows"]:
+        for a in r.get("assumptions") or []:
+            if a.get("resolved_at") or a.get("id") in seen:
+                continue
+            seen.add(a.get("id"))
+            rows = _fmt_row_range(a.get("rows") or [r["n"]])
+            lines.append(f"    rows {rows:9} {('(' + a['owner'] + ')') if a.get('owner') else '':12} "
+                         f"{a['text'][:80]}  id={a.get('id')}")
+    print("")
+    print("Open assumptions (confirm before the board goes to stakeholders):")
+    print("\n".join(lines) if lines else "  none")
+
+
+def _keep_layers(row, file_rel, asset):
+    """A re-register of the SAME file keeps the layer deliverables rebuild.py recorded
+    (graphic on alpha + bg); otherwise the board loses its pointer to the editor's files."""
+    for old in row.get("assets") or []:
+        if old.get("file") == file_rel and old.get("layers"):
+            asset["layers"] = old["layers"]
+    return asset
+
 def register(sb_path, n, file_rel, poster_rel, kind, source, duration=None,
              status="Generated", series_id=None):
-    doc = load(sb_path); row = row_by_n(doc, n)
-    asset = {"file": file_rel, "poster": poster_rel, "kind": kind,
-             "source": source, "duration": duration, "registered_at": now_iso()}
-    if series_id: asset["series_id"] = series_id
-    row["assets"] = [asset]; row["status"] = status
-    save(sb_path, doc)
+    with editing(sb_path) as doc:
+        row = row_by_n(doc, n)
+        asset = {"file": file_rel, "poster": poster_rel, "kind": kind,
+                 "source": source, "duration": duration, "registered_at": now_iso()}
+        if series_id: asset["series_id"] = series_id
+        row["assets"] = [_keep_layers(row, file_rel, asset)]; row["status"] = status
     print(f"row {n}: {file_rel} ({status})" + (f" series={series_id}" if series_id else ""))
 
 # Where inside a beat to grab its poster, as a fraction of the segment.
@@ -168,6 +264,39 @@ def _cut_beat_posters(sb_path, rows, bounds, file_rel, poster_at, poster_times):
     return out
 
 
+def clip_bounds(k, total, cuts=None):
+    """Segment boundaries for k rows sharing one clip: explicit cuts (k+1 values) or an even split."""
+    if cuts and len(cuts) == k + 1:
+        return [float(c) for c in cuts]
+    step = float(total) / k
+    return [round(i * step, 3) for i in range(k)] + [round(float(total), 3)]
+
+
+def assign_clip(doc, a, b, file_rel, kind, source, bounds, poster_times=None,
+                poster_at=BEAT_POSTER_AT, poster_rel=None):
+    """Point rows a..b of an in-memory doc at ONE shared file, each with its own segment and its
+    own poster path + poster_t. Cuts no frames — the caller does (register_clip right away;
+    rebuild.py after it has rendered the file). Returns the rows touched."""
+    rows = [r for r in doc["rows"] if int(a) <= r["n"] <= int(b)]
+    clip_group = f"clip_{int(a):03d}_{int(b):03d}"
+    stamp = now_iso()
+    for i, r in enumerate(rows):
+        lo, hi = bounds[i], bounds[i + 1]
+        pt = poster_times[i] if poster_times and i < len(poster_times) else None
+        t = float(pt) if pt is not None else lo + (hi - lo) * poster_at
+        asset = {"file": file_rel,
+                 "poster": poster_rel or os.path.join(os.path.dirname(file_rel), name_for(r, "png")),
+                 "kind": kind, "source": source, "duration": round(hi - lo, 3),
+                 "segment": [lo, hi], "clip_group": clip_group, "registered_at": stamp,
+                 "poster_t": round(t, 3)}
+        for old in r.get("assets") or []:      # keep a pinned encoder setting across re-registers
+            if old.get("file") == file_rel and old.get("crf"):
+                asset["crf"] = old["crf"]
+        r["assets"] = [_keep_layers(r, file_rel, asset)]
+        r["status"] = "Generated"
+    return rows
+
+
 def register_clip(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, cuts=None,
                   beat_posters=True, poster_at=BEAT_POSTER_AT, poster_times=None):
     """Point every row in [a,b] at ONE shared file, each with its own in/out segment.
@@ -176,37 +305,30 @@ def register_clip(sb_path, a, b, file_rel, poster_rel, kind, source, total_dur, 
     beat_posters: cut a separate poster per row from inside its segment (default). Each row's
                   asset records `poster_t` so the frame is reproducible and reviewable.
     poster_times: explicit absolute seconds, one per row, overriding poster_at for that row.
+
+    For a HyperFrames graphic, prefer an entry in <graphics>/plan.json: rebuild.py then registers
+    the rows itself after rendering, in one pass (no register -> render -> register dance).
     """
-    a, b, total = int(a), int(b), float(total_dur)
-    doc = load(sb_path)
-    rows = [r for r in doc["rows"] if a <= r["n"] <= b]
+    a, b = int(a), int(b)
+    rows = [r for r in load(sb_path)["rows"] if a <= r["n"] <= b]
     if not rows:
         print(f"no rows in {a}-{b}"); return
     k = len(rows)
-    if cuts and len(cuts) == k + 1:
-        bounds = [float(c) for c in cuts]
-    else:
-        step = total / k
-        bounds = [round(i * step, 3) for i in range(k)] + [round(total, 3)]
+    bounds = clip_bounds(k, total_dur, cuts)
     if poster_times and len(poster_times) != k:
         print(f"  ! {len(poster_times)} poster time(s) for {k} rows — extras ignored, "
               f"missing ones fall back to {poster_at:.0%} through the segment")
     beats = _cut_beat_posters(sb_path, rows, bounds, file_rel, poster_at,
                               poster_times) if beat_posters else {}
-    clip_group = f"clip_{a:03d}_{b:03d}"
-    registered_at = now_iso()
-    for i, r in enumerate(rows):
-        rel, t = beats.get(r["n"], (poster_rel, None))
-        asset = {"file": file_rel, "poster": rel, "kind": kind, "source": source,
-                 "duration": round(bounds[i+1] - bounds[i], 3),
-                 "segment": [bounds[i], bounds[i+1]], "clip_group": clip_group,
-                 "registered_at": registered_at}
-        if t is not None:
-            asset["poster_t"] = t          # recorded so the frame can be re-cut identically
-        r["assets"] = [asset]
-        r["status"] = "Generated"
-    save(sb_path, doc)
-    print(f"clip {clip_group}: {file_rel} across rows {a}-{b}")
+    with editing(sb_path) as doc:
+        rows = assign_clip(doc, a, b, file_rel, kind, source, bounds, poster_times, poster_at)
+        for r in rows:
+            if r["n"] in beats:
+                r["assets"][0]["poster"], r["assets"][0]["poster_t"] = beats[r["n"]]
+            else:                                  # no frame cut: every row shows the shared poster
+                r["assets"][0]["poster"] = poster_rel
+                r["assets"][0].pop("poster_t", None)
+    print(f"clip clip_{a:03d}_{b:03d}: {file_rel} across rows {a}-{b}")
     for i, r in enumerate(rows):
         rel, t = beats.get(r["n"], (poster_rel, None))
         at = f"  poster @ {t:.2f}s -> {os.path.basename(rel)}" if t is not None else \
@@ -265,6 +387,8 @@ def _row_open_feedback(root, row):
     asset_date = age.date() if age else None
     opens, undated = [], 0
     for e in row.get("feedback") or []:
+        if e.get("resolved_at"):              # explicitly closed — never open, never undated
+            continue
         when = e.get("when")
         if not when:
             undated += 1
@@ -327,11 +451,66 @@ def _print_open_feedback(doc, root):
         print(f"  undated-only (not open): rows {_fmt_row_range(only_undated)}")
 
 
-def plan(sb_path):
+def _placement(row):
+    """Overlay side from the row's direction/brief: 'lower third' | 'left' | 'right' | ''."""
+    for text in (row.get("visual_direction", ""), row.get("brief", "")):   # direction wins
+        d = text.lower()
+        hits = [(d.find(p), p) for p in ("lower third", "left", "right") if p in d]
+        if hits:
+            return min(hits)[1]                # the first side named is the overlay's
+    return ""
+
+
+def style_samples(doc):
+    """One pending row per look the board will repeat: each visual type the free route renders,
+    and each overlay placement. Rendering these first and getting a sign-off is the cheap way to
+    catch a project-wide style call (ground colour, cards vs type, quote marks, data scale) before
+    it costs a re-render of every row."""
+    GBT, norm = _routing()
+    picked, seen = [], set()
+    for r in doc["rows"]:
+        if _route_of(r, GBT, norm) != "hyperframes":
+            continue
+        try:
+            vt = norm(r["visual_type"])
+        except Exception:
+            vt = r.get("visual_type", "")
+        key = (vt, _placement(r) if vt == "TALKING HEAD + OVERLAY" else "")
+        if key in seen:
+            continue
+        seen.add(key)
+        picked.append((r["n"], " / ".join(k for k in key if k), r.get("slug", "")))
+    return picked
+
+
+def signoff(sb_path, who="user", note=""):
+    """Stamp the style sign-off on the board: the sample frames were seen and the look is agreed.
+    `plan` stops recommending a full render until this exists."""
+    with editing(sb_path) as doc:
+        doc["style_signoff"] = {"when": now_iso(), "by": who, "note": note,
+                                "samples": [n for n, _k, _s in style_samples(doc)]}
+    print(f"style signed off by {who}" + (f": {note}" if note else ""))
+
+
+def plan(sb_path, samples_only=False):
     """Bucket the whole board for a no-arg /storyboard-generate: free/local rows to make now,
-    paid Higgsfield rows to confirm. Prints a readable plan; spends nothing."""
+    paid Higgsfield rows to confirm. Prints a readable plan; spends nothing.
+
+    Until the board carries a `style_signoff`, the plan leads with the style samples (one row per
+    visual type / overlay placement) and says to render only those and get a sign-off first."""
     GBT, norm = _routing()
     doc = load(sb_path)
+    if samples_only or not doc.get("style_signoff"):
+        smp = style_samples(doc)
+        print("STYLE GATE — no sign-off yet. Render ONLY these samples, show them, and run")
+        print("  generate_row.py signoff <sb> \"<who>\" once the look is agreed:")
+        for n, key, slug in smp:
+            print("    row %3d  %-34s %s" % (n, key, slug))
+        print("  Settle with the user before the full pass: ground (light/dark), overlay style (cards or")
+        print("  type over footage), quote marks, number formats, and every figure the graphics assert.")
+        if samples_only:
+            return {"samples": smp}
+        print("")
     local, paid, done = [], [], 0
     for r in doc["rows"]:
         if r.get("status") in ("Generated", "Approved"):
@@ -357,9 +536,11 @@ def plan(sb_path):
     print("Generate the free rows now; ask before the paid rows (or run `/storyboard-generate b-roll`).")
     root = os.path.dirname(os.path.abspath(sb_path))
     _print_open_feedback(doc, root)
+    _print_open_assumptions(doc)
     return {"local": local, "paid": paid, "done": done, "est_credits": est}
 
-USAGE = "commands: plan | add_feedback | feedback | download | silence | poster | register | register_clip"
+USAGE = ("commands: plan [--samples] | signoff | assume | add_feedback | feedback | resolve | "
+         "download | silence | poster | register | register_clip")
 
 if __name__ == "__main__":
     try:
@@ -398,10 +579,29 @@ if __name__ == "__main__":
             register_clip(*pos[:8], cuts=(pos[8:] or None), beat_posters=beat_posters,
                           poster_at=poster_at, poster_times=poster_times)
         elif cmd == "plan":
-            plan(sys.argv[2])
+            # plan <sb> [--samples]
+            plan(sys.argv[2], samples_only="--samples" in sys.argv[3:])
+        elif cmd == "signoff":
+            # signoff <sb> ["<who>"] ["<note>"]
+            signoff(sys.argv[2], *(sys.argv[3:5]))
+        elif cmd == "assume":
+            # assume <sb> <selector> "<text>" [--owner NAME]
+            rest = sys.argv[3:]
+            owner = ""
+            if "--owner" in rest:
+                i = rest.index("--owner"); owner = rest[i + 1]; rest = rest[:i] + rest[i + 2:]
+            assume(sys.argv[2], rest[0], rest[1], owner)
         elif cmd == "add_feedback":
             # add_feedback <sb> <selector> "<text>"  — selector: n | a,b,c | A-B
             add_feedback(sys.argv[2], sys.argv[3], sys.argv[4])
+        elif cmd == "resolve":
+            # resolve <sb> [selector|all] [--id ID] [--assumptions]
+            rest = sys.argv[3:]
+            eid, asm = None, "--assumptions" in rest
+            rest = [x for x in rest if x != "--assumptions"]
+            if "--id" in rest:
+                i = rest.index("--id"); eid = rest[i + 1]; rest = rest[:i] + rest[i + 2:]
+            resolve_feedback(sys.argv[2], rest[0] if rest else "all", eid, asm)
         elif cmd == "feedback":
             # feedback <sb> [selector]
             feedback_cmd(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
