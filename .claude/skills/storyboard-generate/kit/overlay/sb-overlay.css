@@ -12,6 +12,10 @@
 .zone.right{left:1010px;width:810px;top:140px;height:800px}
 .zone.left{left:100px;width:810px;top:140px;height:800px}
 .zone.lower{left:140px;width:1640px;top:790px;height:220px;flex-direction:row;align-items:flex-end;justify-content:flex-start}
+/* full-screen cutaway: the same 810px column, centred in the frame and scaled up 1.35x, so a spec
+   written for a side overlay (hand breaks, widow fixes) reads unchanged as a full-frame graphic.
+   transform, not zoom: Chrome scales left/top under zoom and the centring breaks. */
+.zone.full{left:555px;width:810px;top:140px;height:800px;transform:scale(1.35);transform-origin:50% 50%}
 /* presenter centred, a big lower third centred under them (title-safe, sits on the bottom edge) */
 .zone.center-lower{left:96px;width:1728px;top:640px;height:390px;flex-direction:row;align-items:flex-end;justify-content:center;text-align:center}
 /* presenter centred, items in the side gutters, clear of the face: place each child with

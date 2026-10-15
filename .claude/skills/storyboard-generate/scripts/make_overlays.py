@@ -10,7 +10,11 @@ The project keeps only what is its own — the copy and layout of each overlay �
             name (NNN_slug)          rows  placement  builder(beat_starts) -> inner html  [, bg image]
             placements: right | left | lower | center-lower | sides (see kit/overlay/sb-overlay.css);
             an optional 5th item names a different preview frame in assets/presenter/ (e.g. a
-            screencast stand-in when the overlay sits on screen footage, not the presenter)
+            screencast stand-in when the overlay sits on screen footage, not the presenter), or is
+            raw HTML for a REAL background (starts with "<", no data-sb-preview-only) — the overlay
+            then ships as a full-screen cutaway, e.g. placement "full" on the brand's night band:
+            flat (one mp4) when the HTML carries no data-sb-layer, or graphic + bg layers with
+            data-sb-layer="bg"
   PRESENTER = {"right": "andy-left-dim.jpg", "left": "andy-right-dim.jpg", "lower": "andy-center-dim.jpg"}
             preview frame per placement, in <graphics_dir>/assets/presenter/ (presenter_frames.py)
   HEAD = '<link href="assets/fonts/fonts.css" rel="stylesheet"><link href="shared/brand.css" rel="stylesheet">'
@@ -58,7 +62,7 @@ def page(cid, place, inner, dur, presenter_img, head):
      overlay specs — edit the spec, not this file. The presenter frame is a preview-only background:
      the board shows the overlay over it, the editor receives the overlay alone on alpha. -->
 <div id="root" data-composition-id="{cid}" data-start="0" data-duration="{dur}" data-width="1920" data-height="1080" data-fps="30">
-  <img class="bg-sil" data-sb-layer="bg" data-sb-preview-only data-check-ignore src="assets/presenter/{presenter_img}" alt="">
+  {presenter_img if presenter_img.lstrip().startswith("<") else f'<img class="bg-sil" data-sb-layer="bg" data-sb-preview-only data-check-ignore src="assets/presenter/{presenter_img}" alt="">'}
   <div class="zone {place}">{inner}
   </div>
 </div>
