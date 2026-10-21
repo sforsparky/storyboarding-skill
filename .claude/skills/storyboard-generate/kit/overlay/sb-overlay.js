@@ -35,7 +35,8 @@ window.SB_OV = {
     document.querySelectorAll("[data-count]").forEach((el) => {
       const to = parseFloat(el.dataset.count), at = parseFloat(el.dataset.countAt || el.dataset.in || 0);
       const pre = el.dataset.prefix || "", suf = el.dataset.suffix || "", o = { v: 0 };
-      const fmt = (v) => pre + Math.round(v).toLocaleString("en-US") + suf;
+      // the suffix ("+") lands with the final number: mid-count "0+" or "8,412+" reads wrong
+      const fmt = (v) => pre + Math.round(v).toLocaleString("en-US") + (Math.round(v) >= to ? suf : "");
       el.textContent = fmt(0);
       tl.fromTo(o, { v: 0 }, { v: to, duration: 1.2, ease: "power2.out", onUpdate: () => (el.textContent = fmt(o.v)) }, at);
     });
